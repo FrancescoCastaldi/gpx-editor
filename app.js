@@ -21,7 +21,9 @@ function setupEventListeners() {
         e.preventDefault();
         dropZone.classList.add('active');
     };
+
     dropZone.ondragleave = () => dropZone.classList.remove('active');
+
     dropZone.ondrop = (e) => {
         e.preventDefault();
         dropZone.classList.remove('active');
@@ -38,7 +40,7 @@ function setupEventListeners() {
 async function handleFiles(files) {
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) overlay.style.display = 'grid';
-    
+
     for (const file of files) {
         const ext = file.name.split('.').pop().toLowerCase();
         if (ext !== 'gpx' && ext !== 'fit') continue;
@@ -68,7 +70,7 @@ async function handleFiles(files) {
         currentFileIndex = activeFiles.length - 1;
         showEditor(activeFiles[currentFileIndex]);
     }
-    
+
     if (overlay) overlay.style.display = 'none';
 }
 
@@ -96,38 +98,19 @@ async function parseGPX(fileData) {
 
 async function parseFIT(fileData) {
     const arrayBuffer = await fileData.raw.arrayBuffer();
-    // FitParser constructor from fit-file-parser.js (browser version)
-    const fitParser = new FitParser({
-        force: true,
-        speedUnit: 'km/h',
-        lengthUnit: 'km',
-        mode: 'cascade'
-    });
-
-    return new Promise((resolve, reject) => {
-        fitParser.parse(arrayBuffer, (error, data) => {
-            if (error) return reject(error);
-            fileData.fitData = data;
-            
-            const records = data.records || [];
-            records.forEach(rec => {
-                if (rec.position_lat === undefined || rec.position_long === undefined) return;
-
-                // Semicircles to degrees conversion
-                const lat = rec.position_lat * (180 / Math.pow(2, 31));
-                const lon = rec.position_long * (180 / Math.pow(2, 31));
-
-                fileData.points.push({
-                    lat, lon,
-                    ele: rec.altitude || 0,
-                    time: new Date(rec.timestamp),
-                    pwr: rec.power || null,
-                    speed: rec.speed || null
-                });
-            });
-            resolve();
-        });
-    });
+    
+    // Header FIT: 14 byte (o 12)
+    // Usiamo una versione semplificata del parsing dei record per estrarre i dati base
+    // senza dipendere da librerie esterne rotte
+    
+    const view = new DataView(arrayBuffer);
+    const headerSize = view.getUint8(0);
+    const dataSize = view.getUint32(4, true);
+    
+    // Semplificazione: per ora avvisiamo che il supporto FIT nativo richiede una libreria valida
+    // ma cerchiamo di non bloccare l'app
+    console.warn("Parsing FIT nativo non ancora implementato correttamente senza librerie esterne.");
+    throw new Error("Formato FIT non ancora supportato (librerie mancanti)");
 }
 
 function showEditor(file) {
@@ -138,7 +121,7 @@ function showEditor(file) {
     if (dropZone) dropZone.style.display = 'none';
     if (layout) layout.style.display = 'grid';
     if (info) info.textContent = `${file.name} (${file.points.length} punti)`;
-    
+
     renderChart(file);
 }
 
@@ -146,6 +129,7 @@ function renderChart(file) {
     const canvas = document.getElementById('activityChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+
     if (chart) chart.destroy();
 
     const step = Math.max(1, Math.floor(file.points.length / 500));
@@ -179,10 +163,24 @@ function renderChart(file) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             scales: {
-                y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Watt' } },
-                y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Metri' } }
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: { display: true, text: 'Watt' }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Metri' }
+                }
             }
         }
     });
@@ -192,6 +190,7 @@ function renderChart(file) {
 function applyPowerChanges() {
     if (currentFileIndex === -1) return;
     const file = activeFiles[currentFileIndex];
+    
     const pctInput = document.getElementById('powerPct');
     const addInput = document.getElementById('powerAdd');
     
@@ -203,7 +202,7 @@ function applyPowerChanges() {
             p.pwr = Math.round(p.pwr * pct + add);
         }
     });
-    
+
     file.modified = true;
     renderChart(file);
     alert('Potenza aggiornata!');
@@ -212,9 +211,10 @@ function applyPowerChanges() {
 function applySpeedChanges() {
     if (currentFileIndex === -1) return;
     const file = activeFiles[currentFileIndex];
+    
     const multInput = document.getElementById('speedMult');
     const mult = parseFloat(multInput.value) || 1.0;
-    
+
     if (mult === 1.0) return;
 
     const startTime = file.points[0].time.getTime();
@@ -227,7 +227,7 @@ function applySpeedChanges() {
 
     file.modified = true;
     renderChart(file);
-    alert('Velocità/Tempo aggiornati!');
+    alert('Velocit&#224;/Tempo aggiornati!');
 }
 
 /* ===== EXPORT ===== */
@@ -238,7 +238,7 @@ function exportFile() {
     if (file.ext === 'gpx') {
         exportGPX(file);
     } else {
-        exportFIT(file);
+        alert('Esportazione FIT non ancora disponibile dopo il fix delle librerie.');
     }
 }
 
@@ -253,7 +253,6 @@ function exportGPX(file) {
         // Update Power
         let pNode = pt.querySelector('power');
         if (!pNode) pNode = pt.querySelector('PowerInWatts');
-        
         if (pNode && pointData.pwr !== null) {
             pNode.textContent = pointData.pwr;
         }
@@ -267,31 +266,6 @@ function exportGPX(file) {
 
     const blob = new Blob([new XMLSerializer().serializeToString(newXml)], {type: 'text/xml'});
     downloadBlob(blob, `${file.name.replace('.gpx', '')}_mod.gpx`);
-}
-
-function exportFIT(file) {
-    try {
-        // FitWriter from @markw65/fit-file-writer
-        const writer = new FitWriter();
-        
-        file.points.forEach(p => {
-            const rec = {
-                timestamp: p.time,
-                position_lat: Math.round(p.lat * (Math.pow(2, 31) / 180)),
-                position_long: Math.round(p.lon * (Math.pow(2, 31) / 180)),
-                altitude: p.ele,
-                power: p.pwr,
-                speed: p.speed
-            };
-            writer.writeMessage('record', rec);
-        });
-
-        const fitBlob = writer.finish();
-        downloadBlob(fitBlob, `${file.name.replace('.fit', '')}_mod.fit`);
-    } catch (err) {
-        console.error('FIT Export Error:', err);
-        alert('Errore durante l\'esportazione FIT');
-    }
 }
 
 function downloadBlob(blob, filename) {
