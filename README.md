@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.svg" alt="GPX Editor Logo" width="320"/>
+</p>
+
 # GPX Editor — Power & Speed
 
 GPX Editor è un'applicazione web standalone per modificare file GPX di attività ciclistiche (nativamente compatibile con Garmin Connect e Strava). Tutto il processing avviene localmente nel browser: i tuoi dati non lasciano mai il computer.
