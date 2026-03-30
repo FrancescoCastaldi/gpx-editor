@@ -25,6 +25,7 @@
             --accent-red: #ef4444;
             --accent-yellow: #f59e0b;
         }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); line-height: 1.5; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
         .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
@@ -87,6 +88,7 @@
             <p>Carica il tuo file .FIT o .GPX per sbloccare l'analisi</p>
             <input type="file" id="fileInput" hidden accept=".gpx,.fit">
         </div>
+
         <div id="editorLayout" class="editor-layout">
             <div class="main-content">
                 <div class="preview-grid">
@@ -115,6 +117,14 @@
             </aside>
         </div>
     </div>
+
+    <div id="loadingOverlay">
+        <div style="text-align: center;">
+            <div class="spinner"></div>
+            <p style="margin-top: 1rem; color: var(--text-main);">Elaborazione attività...</p>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
