@@ -148,13 +148,14 @@ async function parseFIT(fileData) {
             elapsedRecordField: true,
             mode: 'cascade'
         });
+
+                return new Promise((resolve, reject) => {
         
         fitParser.parse(arrayBuffer, (error, data) => {
             if (error) {
                 console.error('FIT Parse Error:', error);
                 showToast("Errore nel parsing del file FIT", "danger");
-                return;
-            }
+                reject(error);            }
             
             fileData.fitData = data;
             
@@ -193,9 +194,12 @@ async function parseFIT(fileData) {
             });
             
             calculateBaseStats(fileData, totalPower, powerCount, totalElev);
+                        resolve();
         });
+                            });
     } catch (err) {
         console.error('FIT File Error:', err);
+                reject(err);
         showToast("Impossibile leggere il file FIT", "danger");
     }
 }
