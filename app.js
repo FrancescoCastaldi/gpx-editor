@@ -3,76 +3,42 @@ let activeFiles = [];
 let currentFileIndex = -1;
 let chart = null;
 
-const state = {
-    theme: localStorage.getItem('theme') || 'dark',
-    editMode: 'both', // 'both', 'watt', 'speed'
-    targetWatt: '',
-    targetSpeed: ''
-};
-
 /* ===== INIZIALIZZAZIONE ===== */
 document.addEventListener('DOMContentLoaded', () => {
-    initTheme();
     setupEventListeners();
 });
-
-function initTheme() {
-    document.documentElement.setAttribute('data-theme', state.theme);
-    updateThemeIcon();
-}
-
-function updateThemeIcon() {
-    const btn = document.getElementById('themeToggle');
-    if (btn) btn.innerHTML = state.theme === 'dark' ? '☀️ Light' : '🌙 Dark';
-}
-
-function toggleTheme() {
-    state.theme = state.theme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('theme', state.theme);
-    initTheme();
-}
 
 /* ===== EVENT LISTENERS ===== */
 function setupEventListeners() {
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
+    if (!dropZone || !fileInput) return;
+
     dropZone.onclick = () => fileInput.click();
-    
+
     dropZone.ondragover = (e) => {
         e.preventDefault();
-        dropZone.classList.add('drag-over');
+        dropZone.classList.add('active');
     };
-
-    dropZone.ondragleave = () => dropZone.classList.remove('drag-over');
-
+    dropZone.ondragleave = () => dropZone.classList.remove('active');
     dropZone.ondrop = (e) => {
         e.preventDefault();
-        dropZone.classList.remove('drag-over');
+        dropZone.classList.remove('active');
         handleFiles(e.dataTransfer.files);
     };
 
     fileInput.onchange = (e) => handleFiles(e.target.files);
 
-    // Controlli
-    document.getElementById('editMode').onchange = (e) => {
-        state.editMode = e.target.value;
-        updatePreview();
-    };
-
-    document.getElementById('targetWatt').oninput = (e) => {
-        state.targetWatt = e.target.value;
-        updatePreview();
-    };
-
-    document.getElementById('targetSpeed').oninput = (e) => {
-        state.targetSpeed = e.target.value;
-        updatePreview();
-    };
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) exportBtn.onclick = exportFile;
 }
 
 /* ===== GESTIONE FILE ===== */
 async function handleFiles(files) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.style.display = 'grid';
+    
     for (const file of files) {
         const ext = file.name.split('.').pop().toLowerCase();
         if (ext !== 'gpx' && ext !== 'fit') continue;
@@ -82,280 +48,193 @@ async function handleFiles(files) {
             ext: ext,
             raw: file,
             points: [],
-            stats: {},
             modified: false
         };
 
-        if (ext === 'gpx') {
-            await parseGPX(fileData);
-        } else {
-            await parseFIT(fileData);
+        try {
+            if (ext === 'gpx') {
+                await parseGPX(fileData);
+            } else {
+                await parseFIT(fileData);
+            }
+            activeFiles.push(fileData);
+        } catch (err) {
+            console.error('Error parsing file:', file.name, err);
+            alert(`Errore nel caricamento di ${file.name}`);
         }
-
-        activeFiles.push(fileData);
     }
 
     if (activeFiles.length > 0) {
-        if (currentFileIndex === -1) currentFileIndex = 0;
-        renderFileList();
-        selectFile(currentFileIndex);
-        document.getElementById('editorInterface').classList.remove('hidden');
+        currentFileIndex = activeFiles.length - 1;
+        showEditor(activeFiles[currentFileIndex]);
     }
+    
+    if (overlay) overlay.style.display = 'none';
 }
 
 async function parseGPX(fileData) {
     const text = await fileData.raw.text();
     const parser = new DOMParser();
-    const xml = parser.parseFromString(text, \"text/xml\");
+    const xml = parser.parseFromString(text, "text/xml");
     fileData.xml = xml;
 
     const trks = xml.querySelectorAll('trkpt');
-    let totalPower = 0;
-    let powerCount = 0;
-    let totalElev = 0;
-    let lastElev = null;
-
     trks.forEach(pt => {
         const lat = parseFloat(pt.getAttribute('lat'));
         const lon = parseFloat(pt.getAttribute('lon'));
         const ele = parseFloat(pt.querySelector('ele')?.textContent || 0);
-        const time = new Date(pt.querySelector('time')?.textContent);
+        const timeStr = pt.querySelector('time')?.textContent;
+        const time = timeStr ? new Date(timeStr) : new Date();
         const pwr = pt.querySelector('power, PowerInWatts')?.textContent;
 
-        const point = { lat, lon, ele, time, pwr: pwr ? parseInt(pwr) : null };
-        fileData.points.push(point);
-
-        if (point.pwr !== null) {
-            totalPower += point.pwr;
-            powerCount++;
-        }
-        if (lastElev !== null && ele > lastElev) totalElev += (ele - lastElev);
-        lastElev = ele;
+        fileData.points.push({
+            lat, lon, ele, time,
+            pwr: pwr ? parseInt(pwr) : null
+        });
     });
-
-    calculateBaseStats(fileData, totalPower, powerCount, totalElev);
 }
 
 async function parseFIT(fileData) {
-    try {
-        const arrayBuffer = await fileData.raw.arrayBuffer();
-        // fit-file-parser v1.8.x style
-        const fitParser = new FitParser({
-            force: true,
-            speedUnit: 'km/h',
-            lengthUnit: 'km',
-            temperatureUnit: 'celsius',
-            elapsedRecordField: true,
-            mode: 'cascade'
-        });
+    const arrayBuffer = await fileData.raw.arrayBuffer();
+    // FitParser constructor from fit-file-parser.js (browser version)
+    const fitParser = new FitParser({
+        force: true,
+        speedUnit: 'km/h',
+        lengthUnit: 'km',
+        mode: 'cascade'
+    });
 
-        return new Promise((resolve, reject) => {
-            fitParser.parse(arrayBuffer, (error, data) => {
-                if (error) {
-                    console.error('FIT Parse Error:', error);
-                    showToast(\"Errore nel parsing del file FIT\", \"danger\");
-                    reject(error);
-                }
-                fileData.fitData = data;
-                
-                const records = data.records || [];
-                let totalPower = 0;
-                let powerCount = 0;
-                let totalElev = 0;
-                let lastElev = null;
+    return new Promise((resolve, reject) => {
+        fitParser.parse(arrayBuffer, (error, data) => {
+            if (error) return reject(error);
+            fileData.fitData = data;
+            
+            const records = data.records || [];
+            records.forEach(rec => {
+                if (rec.position_lat === undefined || rec.position_long === undefined) return;
 
-                records.forEach(rec => {
-                    if (rec.position_lat === undefined || rec.position_long === undefined) return;
-                    
-                    // Convert semicircles to degrees if needed (common in FIT)
-                    const lat = rec.position_lat > 180 ? rec.position_lat * (180 / Math.pow(2, 31)) : rec.position_lat;
-                    const lon = rec.position_long > 180 ? rec.position_long * (180 / Math.pow(2, 31)) : rec.position_long;
+                // Semicircles to degrees conversion
+                const lat = rec.position_lat * (180 / Math.pow(2, 31));
+                const lon = rec.position_long * (180 / Math.pow(2, 31));
 
-                    const point = {
-                        lat: lat,
-                        lon: lon,
-                        ele: rec.altitude || 0,
-                        time: new Date(rec.timestamp),
-                        pwr: rec.power || null,
-                        speed: rec.speed || null
-                    };
-                    fileData.points.push(point);
-
-                    if (point.pwr !== null) {
-                        totalPower += point.pwr;
-                        powerCount++;
-                    }
-                    if (lastElev !== null && point.ele > lastElev) totalElev += (point.ele - lastElev);
-                    lastElev = point.ele;
+                fileData.points.push({
+                    lat, lon,
+                    ele: rec.altitude || 0,
+                    time: new Date(rec.timestamp),
+                    pwr: rec.power || null,
+                    speed: rec.speed || null
                 });
-
-                calculateBaseStats(fileData, totalPower, powerCount, totalElev);
-                resolve();
             });
+            resolve();
         });
-    } catch (err) {
-        console.error('FIT File Error:', err);
-        showToast(\"Impossibile leggere il file FIT\", \"danger\");
-    }
+    });
 }
 
-function calculateBaseStats(fileData, totalPower, powerCount, totalElev) {
-    const pts = fileData.points;
-    if (pts.length < 2) return;
+function showEditor(file) {
+    const dropZone = document.getElementById('dropZone');
+    const layout = document.getElementById('editorLayout');
+    const info = document.getElementById('fileInfo');
 
-    const dist = calculateDistance(pts);
-    const durationMs = pts[pts.length-1].time - pts[0].time;
-    const avgSpd = (dist / (durationMs / 3600000)).toFixed(1);
-
-    fileData.stats = {
-        avgPower: powerCount > 0 ? Math.round(totalPower / powerCount) : 0,
-        avgSpeed: parseFloat(avgSpd),
-        distance: parseFloat(dist.toFixed(2)),
-        duration: formatMs(durationMs),
-        count: pts.length,
-        elevation: Math.round(totalElev),
-        durationMs: durationMs
-    };
-}
-
-/* ===== UI RENDERING ===== */
-function renderFileList() {
-    const container = document.getElementById('fileList');
-    container.innerHTML = activeFiles.map((f, i) => `
-        <div class=\"file-item ${i === currentFileIndex ? 'active' : ''}\" onclick=\"selectFile(${i})\">
-            <span>${f.name}</span>
-            <button class=\"btn-icon\" onclick=\"removeFile(event, ${i})\">✕</button>
-        </div>
-    `).join('');
-}
-
-function selectFile(index) {
-    currentFileIndex = index;
-    const file = activeFiles[index];
-    renderFileList();
-    updateDashboard(file.stats);
+    if (dropZone) dropZone.style.display = 'none';
+    if (layout) layout.style.display = 'grid';
+    if (info) info.textContent = `${file.name} (${file.points.length} punti)`;
+    
     renderChart(file);
-
-    // Aggiorna input
-    document.getElementById('targetWatt').value = file.stats.avgPower || '';
-    document.getElementById('targetSpeed').value = file.stats.avgSpeed || '';
-    updatePreview();
-}
-
-function removeFile(e, index) {
-    e.stopPropagation();
-    activeFiles.splice(index, 1);
-    if (currentFileIndex >= activeFiles.length) currentFileIndex = activeFiles.length - 1;
-    if (activeFiles.length === 0) {
-        document.getElementById('editorInterface').classList.add('hidden');
-        currentFileIndex = -1;
-    } else {
-        selectFile(currentFileIndex);
-    }
-    renderFileList();
-}
-
-function updateDashboard(stats) {
-    document.getElementById('avgPower').textContent = stats.avgPower || '-';
-    document.getElementById('avgSpeed').textContent = stats.avgSpeed || '-';
-    document.getElementById('distance').textContent = stats.distance || '-';
-    document.getElementById('duration').textContent = stats.duration || '-';
-    document.getElementById('points').textContent = stats.count || '-';
-    document.getElementById('elevation').textContent = stats.elevation || '-';
-}
-
-/* ===== TOOLS ===== */
-function calculateDistance(pts) {
-    let d = 0;
-    const R = 6371;
-    for(let i=1; i < pts.length; i++) {
-        const dLat = (pts[i].lat - pts[i-1].lat) * Math.PI / 180;
-        const dLon = (pts[i].lon - pts[i-1].lon) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(pts[i-1].lat * Math.PI / 180) * Math.cos(pts[i].lat * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        d += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    }
-    return d;
-}
-
-function formatMs(ms) {
-    const s = Math.floor(ms / 1000);
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return `${h}h ${m}m`;
 }
 
 function renderChart(file) {
-    const ctx = document.getElementById('mainChart').getContext('2d');
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     if (chart) chart.destroy();
 
-    const step = Math.max(1, Math.floor(file.points.length / 300));
+    const step = Math.max(1, Math.floor(file.points.length / 500));
     const sampled = file.points.filter((_, i) => i % step === 0);
 
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: sampled.map((_, i) => i),
+            labels: sampled.map(p => p.time.toLocaleTimeString()),
             datasets: [
-                {
-                    label: 'Elevazione (m)',
-                    data: sampled.map(p => p.ele),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    yAxisID: 'y',
-                    tension: 0.3,
-                    pointRadius: 0
-                },
                 {
                     label: 'Potenza (W)',
                     data: sampled.map(p => p.pwr),
                     borderColor: '#ef4444',
-                    yAxisID: 'y1',
-                    tension: 0.3,
-                    pointRadius: 0
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Quota (m)',
+                    data: sampled.map(p => p.ele),
+                    borderColor: '#3b82f6',
+                    borderWidth: 1,
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    pointRadius: 0,
+                    yAxisID: 'y1'
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            interaction: { mode: 'index', intersect: false },
             scales: {
-                x: { display: false },
-                y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' } },
-                y1: { type: 'linear', position: 'right', grid: { display: false } }
+                y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Watt' } },
+                y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Metri' } }
             }
         }
     });
 }
 
-/* ===== EXPORT & PREVIEW ===== */
-function updatePreview() {
+/* ===== EDITING FUNCTIONS ===== */
+function applyPowerChanges() {
     if (currentFileIndex === -1) return;
     const file = activeFiles[currentFileIndex];
-    const currPwr = file.stats.avgPower || 1;
-    const currSpd = file.stats.avgSpeed || 1;
-    const targetPwr = parseInt(state.targetWatt) || currPwr;
-    const targetSpd = parseFloat(state.targetSpeed) || currSpd;
+    const pctInput = document.getElementById('powerPct');
+    const addInput = document.getElementById('powerAdd');
+    
+    const pct = (parseFloat(pctInput.value) || 0) / 100 + 1;
+    const add = parseInt(addInput.value) || 0;
 
-    let text = \"\";
-    if (state.editMode !== 'speed' && file.stats.avgPower > 0) {
-        const pDiff = (((targetPwr / currPwr) - 1) * 100).toFixed(1);
-        text += `Watt: ${pDiff > 0 ? '+' : ''}${pDiff}% | `;
-    }
-    if (state.editMode !== 'watt') {
-        const sDiff = (((targetSpd / currSpd) - 1) * 100).toFixed(1);
-        const timeChange = (1 / (targetSpd / currSpd) - 1) * 100;
-        text += `Tempo: ${timeChange > 0 ? '+' : ''}${timeChange.toFixed(1)}% (Velocità)`;
-    }
-    document.getElementById('previewText').textContent = text || \"Nessuna modifica\";
+    file.points.forEach(p => {
+        if (p.pwr !== null) {
+            p.pwr = Math.round(p.pwr * pct + add);
+        }
+    });
+    
+    file.modified = true;
+    renderChart(file);
+    alert('Potenza aggiornata!');
 }
 
+function applySpeedChanges() {
+    if (currentFileIndex === -1) return;
+    const file = activeFiles[currentFileIndex];
+    const multInput = document.getElementById('speedMult');
+    const mult = parseFloat(multInput.value) || 1.0;
+    
+    if (mult === 1.0) return;
+
+    const startTime = file.points[0].time.getTime();
+    file.points.forEach((p, i) => {
+        if (i === 0) return;
+        const origTime = p.time.getTime();
+        const diff = origTime - startTime;
+        p.time = new Date(startTime + (diff / mult));
+    });
+
+    file.modified = true;
+    renderChart(file);
+    alert('Velocità/Tempo aggiornati!');
+}
+
+/* ===== EXPORT ===== */
 function exportFile() {
     if (currentFileIndex === -1) return;
     const file = activeFiles[currentFileIndex];
+
     if (file.ext === 'gpx') {
         exportGPX(file);
     } else {
@@ -364,103 +243,62 @@ function exportFile() {
 }
 
 function exportGPX(file) {
-    const currPwr = file.stats.avgPower || 1;
-    const currSpd = file.stats.avgSpeed || 1;
-    const targetPwr = parseInt(state.targetWatt) || currPwr;
-    const targetSpd = parseFloat(state.targetSpeed) || currSpd;
-
-    const pFactor = targetPwr / currPwr;
-    const tFactor = currSpd / targetSpd;
-
     const newXml = file.xml.cloneNode(true);
     const trks = newXml.querySelectorAll('trkpt');
 
-    let startTime = new Date(trks[0].querySelector('time').textContent).getTime();
-    let lastOrigTime = startTime;
-    let currentNewTime = startTime;
-
     trks.forEach((pt, i) => {
-        if (state.editMode !== 'speed') {
-            const pNode = pt.querySelector('power, PowerInWatts');
-            if (pNode) pNode.textContent = Math.round(parseInt(pNode.textContent) * pFactor);
+        const pointData = file.points[i];
+        if (!pointData) return;
+
+        // Update Power
+        let pNode = pt.querySelector('power');
+        if (!pNode) pNode = pt.querySelector('PowerInWatts');
+        
+        if (pNode && pointData.pwr !== null) {
+            pNode.textContent = pointData.pwr;
         }
 
-        if (state.editMode !== 'watt' && i > 0) {
-            const timeNode = pt.querySelector('time');
-            const origTime = new Date(timeNode.textContent).getTime();
-            const diff = origTime - lastOrigTime;
-            currentNewTime += (diff * tFactor);
-            timeNode.textContent = new Date(currentNewTime).toISOString();
-            lastOrigTime = origTime;
+        // Update Time
+        const tNode = pt.querySelector('time');
+        if (tNode) {
+            tNode.textContent = pointData.time.toISOString();
         }
     });
 
     const blob = new Blob([new XMLSerializer().serializeToString(newXml)], {type: 'text/xml'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${file.name.replace('.gpx', '')}_modified.gpx`;
-    a.click();
-    showToast(\"File GPX esportato con successo!\");
+    downloadBlob(blob, `${file.name.replace('.gpx', '')}_mod.gpx`);
 }
 
 function exportFIT(file) {
-    const currPwr = file.stats.avgPower || 1;
-    const currSpd = file.stats.avgSpeed || 1;
-    const targetPwr = parseInt(state.targetWatt) || currPwr;
-    const targetSpd = parseFloat(state.targetSpeed) || currSpd;
-
-    const pFactor = targetPwr / currPwr;
-    const tFactor = currSpd / targetSpd;
-
-    // Usando @markw65/fit-file-writer
     try {
-        const writer = new FitWriter.FitWriter();
-        const records = file.fitData.records || [];
+        // FitWriter from @markw65/fit-file-writer
+        const writer = new FitWriter();
         
-        let startTime = new Date(records[0].timestamp).getTime();
-        let lastOrigTime = startTime;
-        let currentNewTime = startTime;
-
-        records.forEach((rec, i) => {
-            const newRec = { ...rec };
-            
-            // Modifica potenza
-            if (state.editMode !== 'speed' && newRec.power !== undefined) {
-                newRec.power = Math.round(newRec.power * pFactor);
-            }
-
-            // Modifica tempo
-            if (state.editMode !== 'watt' && i > 0) {
-                const origTime = new Date(rec.timestamp).getTime();
-                const diff = origTime - lastOrigTime;
-                currentNewTime += (diff * tFactor);
-                newRec.timestamp = new Date(currentNewTime);
-                lastOrigTime = origTime;
-            } else {
-                newRec.timestamp = new Date(currentNewTime);
-            }
-
-            writer.writeMessage('record', newRec);
+        file.points.forEach(p => {
+            const rec = {
+                timestamp: p.time,
+                position_lat: Math.round(p.lat * (Math.pow(2, 31) / 180)),
+                position_long: Math.round(p.lon * (Math.pow(2, 31) / 180)),
+                altitude: p.ele,
+                power: p.pwr,
+                speed: p.speed
+            };
+            writer.writeMessage('record', rec);
         });
 
         const fitBlob = writer.finish();
-        const url = URL.createObjectURL(fitBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${file.name.replace('.fit', '')}_modified.fit`;
-        a.click();
-        showToast(\"File FIT esportato con successo!\");
+        downloadBlob(fitBlob, `${file.name.replace('.fit', '')}_mod.fit`);
     } catch (err) {
-        console.error('Export FIT Error:', err);
-        showToast(\"Errore nell'esportazione FIT.\", \"danger\");
+        console.error('FIT Export Error:', err);
+        alert('Errore durante l\'esportazione FIT');
     }
 }
 
-function showToast(msg, type = 'success') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.style.background = type === 'success' ? 'var(--success)' : (type === 'warning' ? 'var(--warning)' : 'var(--danger)');
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
 }
