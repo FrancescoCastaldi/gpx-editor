@@ -3,95 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CycleEdit Pro - Power & Speed Editor</title>
+    <title>CycleEdit Pro - Advanced Activity Editor</title>
     <link rel="icon" href="logo.svg" type="image/svg+xml">
-
+    
     <!-- Librerie Esterne -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+    
     <style>
         :root {
             --primary: #3b82f6;
             --primary-hover: #2563eb;
-            --bg-dark: #0f172a;
-            --card-bg: #1e293b;
+            --bg-dark: #020617;
+            --card-bg: #0f172a;
+            --card-border: #1e293b;
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
             --accent-green: #10b981;
             --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); line-height: 1.5; overflow-x: hidden; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem; }
-        .logo { font-size: 1.5rem; font-weight: 900; background: linear-gradient(45deg, var(--primary), #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px; }
-        .drop-zone { border: 2px dashed #334155; border-radius: 1.5rem; padding: 4rem 2rem; text-align: center; transition: all 0.3s; background: var(--card-bg); cursor: pointer; position: relative; }
-        .drop-zone.active { border-color: var(--primary); background: #1e293b; transform: scale(1.01); }
-        .drop-zone h2 { font-size: 1.25rem; margin-bottom: 0.5rem; color: var(--text-main); }
-        .drop-zone p { color: var(--text-dim); font-size: 0.875rem; }
-        .editor-layout { display: none; grid-template-columns: 1fr 320px; gap: 2rem; margin-top: 2rem; }
-        .main-panel { background: var(--card-bg); border-radius: 1.5rem; padding: 2rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
-        .side-panel { display: flex; flex-direction: column; gap: 1.5rem; }
-        .chart-container { height: 450px; position: relative; }
-        .control-card { background: var(--card-bg); border-radius: 1.25rem; padding: 1.5rem; border: 1px solid #334155; }
-        .control-card h3 { font-size: 0.875rem; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem; letter-spacing: 0.05em; }
-        .input-group { margin-bottom: 1.5rem; }
-        .input-group label { display: block; font-size: 0.813rem; color: var(--text-dim); margin-bottom: 0.5rem; }
-        .input-group input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 0.75rem; padding: 0.75rem 1rem; color: white; font-size: 0.938rem; transition: border-color 0.2s; }
-        .input-group input:focus { outline: none; border-color: var(--primary); }
-        .btn { width: 100%; padding: 1rem; border-radius: 0.875rem; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.938rem; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); line-height: 1.5; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; }
+        .logo-group { display: flex; flex-direction: column; }
+        .logo { font-size: 1.75rem; font-weight: 900; background: linear-gradient(135deg, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1.5px; line-height: 1; }
+        .tagline { font-size: 0.75rem; color: var(--text-dim); font-weight: 500; margin-top: 0.25rem; }
+        .stats-bar { display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 1rem; padding: 1rem; text-align: center; }
+        .stat-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+        .drop-zone { border: 2px dashed var(--card-border); border-radius: 2rem; padding: 6rem 2rem; text-align: center; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: var(--card-bg); cursor: pointer; margin-top: 4rem; }
+        .drop-zone:hover, .drop-zone.active { border-color: var(--primary); background: #1e293b55; transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
+        .drop-zone h2 { font-size: 1.5rem; margin-bottom: 0.75rem; font-weight: 800; }
+        .drop-zone p { color: var(--text-dim); font-size: 0.938rem; }
+        .editor-layout { display: none; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+        .main-content { display: flex; flex-direction: column; gap: 1.5rem; }
+        .preview-grid { display: grid; grid-template-rows: 400px 300px; gap: 1.5rem; }
+        .card { background: var(--card-bg); border-radius: 1.5rem; border: 1px solid var(--card-border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        #map { width: 100%; height: 100%; z-index: 1; background: #111; }
+        .chart-wrapper { padding: 1.5rem; height: 100%; }
+        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+        .control-group { padding: 1.25rem; }
+        .control-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+        .input-row { margin-bottom: 1rem; }
+        .input-row label { display: block; font-size: 0.813rem; font-weight: 500; color: var(--text-dim); margin-bottom: 0.5rem; }
+        .input-row input { width: 100%; background: #020617; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 0.75rem; color: white; font-size: 0.938rem; transition: all 0.2s; }
+        .input-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .btn { width: 100%; padding: 0.875rem; border-radius: 0.875rem; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.938rem; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-        .btn-success { background: var(--accent-green); color: white; margin-top: auto; }
-        .btn-success:hover { background: #059669; transform: translateY(-1px); }
-        #loadingOverlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); display: none; place-items: center; z-index: 1000; backdrop-filter: blur(4px); }
-        .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .btn-export { background: var(--accent-green); color: white; margin-top: auto; }
+        .btn-export:hover { background: #059669; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
+        #loadingOverlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.8); display: none; place-items: center; z-index: 2000; backdrop-filter: blur(8px); }
+        .spinner { width: 48px; height: 48px; border: 4px solid #1e293b; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .file-info { display: flex; align-items: center; gap: 1rem; color: var(--text-dim); font-size: 0.875rem; }
+        @media (max-width: 1024px) { .editor-layout { grid-template-columns: 1fr; } .preview-grid { grid-template-rows: 350px 300px; } }
     </style>
 </head>
 <body>
-    <div id="loadingOverlay"><div class="spinner"></div></div>
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
     <div class="container">
-        <div class="header">
-            <div class="logo">CYCLE EDIT PRO</div>
-            <div class="file-info" id="fileInfo"></div>
+        <header class="header">
+            <div class="logo-group">
+                <div class="logo">CYCLE EDIT PRO</div>
+                <div class="tagline">Advanced Activity Power & Speed Intelligence</div>
+            </div>
+            <div id="fileInfo" class="tagline">Trascina un file per iniziare</div>
+        </header>
+        <div id="statsBar" class="stats-bar">
+            <div class="stat-card"><div class="stat-label">Distanza</div><div id="statDist" class="stat-value">0.0 km</div></div>
+            <div class="stat-card"><div class="stat-label">Dislivello</div><div id="statEle" class="stat-value">0 m</div></div>
+            <div class="stat-card"><div class="stat-label">Watt Medi</div><div id="statAvgPwr" class="stat-value">0 W</div></div>
+            <div class="stat-card"><div class="stat-label">Tempo</div><div id="statTime" class="stat-value">00:00:00</div></div>
         </div>
         <div id="dropZone" class="drop-zone">
-            <h2>Trascina il tuo file .fit o .gpx</h2>
-            <p>Supporta Garmin, Strava e Wahoo (Max 15MB)</p>
+            <h2>Pronto per l'elaborazione</h2>
+            <p>Carica il tuo file .FIT o .GPX per sbloccare l'analisi</p>
             <input type="file" id="fileInput" hidden accept=".gpx,.fit">
         </div>
         <div id="editorLayout" class="editor-layout">
-            <div class="main-panel">
-                <div class="chart-container">
-                    <canvas id="activityChart"></canvas>
+            <div class="main-content">
+                <div class="preview-grid">
+                    <div class="card"><div id="map"></div></div>
+                    <div class="card"><div class="chart-wrapper"><canvas id="activityChart"></canvas></div></div>
                 </div>
             </div>
-            <div class="side-panel">
-                <div class="control-card">
-                    <h3>Regolazione Watt</h3>
-                    <div class="input-group">
-                        <label>Incremento %</label>
-                        <input type="number" id="powerPct" value="0" step="1">
-                    </div>
-                    <div class="input-group">
-                        <label>Aggiunta fissa (W)</label>
-                        <input type="number" id="powerAdd" value="0">
-                    </div>
+            <aside class="sidebar">
+                <div class="card control-group">
+                    <div class="control-title">Segmento di Modifica</div>
+                    <div class="input-row"><label>Inizio (%)</label><input type="number" id="rangeStart" value="0" min="0" max="100"></div>
+                    <div class="input-row"><label>Fine (%)</label><input type="number" id="rangeEnd" value="100" min="0" max="100"></div>
+                </div>
+                <div class="card control-group">
+                    <div class="control-title">Regolazione Potenza</div>
+                    <div class="input-row"><label>Variazione %</label><input type="number" id="powerPct" value="0"></div>
+                    <div class="input-row"><label>Aggiunta (W)</label><input type="number" id="powerAdd" value="0"></div>
                     <button class="btn btn-primary" onclick="applyPowerChanges()">Applica Potenza</button>
                 </div>
-                <div class="control-card">
-                    <h3>Regolazione Velocit&#224;</h3>
-                    <div class="input-group">
-                        <label>Moltiplicatore (es. 1.05)</label>
-                        <input type="number" id="speedMult" value="1.0" step="0.01">
-                    </div>
-                    <button class="btn btn-primary" onclick="applySpeedChanges()">Applica Velocit&#224;</button>
+                <div class="card control-group">
+                    <div class="control-title">Regolazione Velocità</div>
+                    <div class="input-row"><label>Fattore Moltiplicativo</label><input type="number" id="speedMult" value="1.0" step="0.01"></div>
+                    <button class="btn btn-primary" onclick="applySpeedChanges()">Applica Velocità</button>
                 </div>
-                <button class="btn btn-success" id="exportBtn">Esporta FIT/GPX</button>
-            </div>
+                <button class="btn btn-export" id="exportBtn">Esporta Attività</button>
+            </aside>
         </div>
     </div>
     <script src="app.js"></script>

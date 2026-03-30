@@ -2,6 +2,9 @@
 let activeFiles = [];
 let currentFileIndex = -1;
 let chart = null;
+let map = null;
+let mapPolyline = null;
+let mapMarker = null;
 
 /* ===== SERVICE WORKER ===== */
 if ('serviceWorker' in navigator) {
@@ -11,6 +14,7 @@ if ('serviceWorker' in navigator) {
 /* ===== INITIALIZATION ===== */
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
+    initMap();
 });
 
 function setupEventListeners() {
@@ -77,6 +81,7 @@ async function handleFiles(files) {
         currentFileIndex = activeFiles.length - 1;
         updateUI();
     }
+
     if (overlay) overlay.style.display = 'none';
 }
 
@@ -84,6 +89,7 @@ async function parseGPX(fileData) {
     const text = await fileData.raw.text();
     const xml = new DOMParser().parseFromString(text, "text/xml");
     fileData.xml = xml;
+
     const trks = xml.querySelectorAll('trkpt');
     trks.forEach(pt => {
         const pwrStr = pt.querySelector('power, PowerInWatts')?.textContent;
@@ -168,6 +174,7 @@ function renderActiveFile() {
     document.getElementById('statEle').textContent = Math.round(Math.max(...file.points.map(p => p.ele)) - Math.min(...file.points.map(p => p.ele))) + ' m';
 
     renderChart(file);
+    renderMap(file);
 }
 
 function renderChart(file) {
@@ -175,6 +182,13 @@ function renderChart(file) {
     if (chart) chart.destroy();
 
     const step = Math.max(1, Math.floor(file.points.length / 800));
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (chart) chart.destroy();
+
+    const step = Math.max(1, Math.floor(file.points.length / 500));
     const sampled = file.points.filter((_, i) => i % step === 0);
 
     chart = new Chart(ctx, {
@@ -218,6 +232,75 @@ function renderChart(file) {
 /* ===== LIVE EDITING ===== */
 function applyLivePowerOffset(offset) {
     const file = activeFiles[currentFileIndex];
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: { display: true, text: 'Watt' }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Metri' }
+                }
+            }
+        }
+    });
+}
+
+function renderMap(file) {
+    if (!map) return;
+    if (mapPolyline) map.removeLayer(mapPolyline);
+    if (mapMarker) map.removeLayer(mapMarker);
+
+    const latlngs = file.points
+        .filter(p => p.lat !== null && p.lon !== null)
+        .map(p => [p.lat, p.lon]);
+
+    if (latlngs.length > 0) {
+        mapPolyline = L.polyline(latlngs, { color: '#3b82f6', weight: 4 }).addTo(map);
+        mapMarker = L.circleMarker(latlngs[0], { radius: 6, color: '#10b981', fillOpacity: 1 }).addTo(map);
+        map.fitBounds(mapPolyline.getBounds(), { padding: [20, 20] });
+    }
+}
+
+/* ===== EDITING FUNCTIONS ===== */
+function applyPowerChanges() {
+    if (currentFileIndex === -1) return;
+    const file = activeFiles[currentFileIndex];
+    const pctInput = document.getElementById('powerPct');
+    const addInput = document.getElementById('powerAdd');
+
+    const pct = (parseFloat(pctInput.value) || 0) / 100 + 1;
+    const add = parseInt(addInput.value) || 0;
+
+    file.points.forEach(p => {
+        if (p.pwr !== null) {
+            p.pwr = Math.round(p.pwr * pct + add);
+        }
+    });
+
+    file.modified = true;
+    renderChart(file);
+    alert('Potenza aggiornata!');
+}
+
+function applySpeedChanges() {
+    if (currentFileIndex === -1) return;
+    const file = activeFiles[currentFileIndex];
+    const multInput = document.getElementById('speedMult');
+    const mult = parseFloat(multInput.value) || 1.0;
+
+    if (mult === 1.0) return;
+
+    const startTime = file.points[0].time.getTime();
     file.points.forEach((p, i) => {
         if (file.originalPower[i] !== null) {
             p.pwr = Math.max(0, file.originalPower[i] + offset);
@@ -228,6 +311,10 @@ function applyLivePowerOffset(offset) {
     const sampledPwr = file.points.filter((_, i) => i % step === 0).map(p => p.pwr);
     chart.data.datasets[0].data = sampledPwr;
     chart.update('none'); // Update without animation for smoothness
+
+    file.modified = true;
+    renderChart(file);
+    alert('Velocita/Tempo aggiornati!');
 }
 
 /* ===== EXPORT ===== */
@@ -264,6 +351,83 @@ ${file.points.map(p => `
 </trkpt>`).join('')}
 </trkseg></trk></gpx>`;
     downloadBlob(new Blob([gpx], {type: 'text/xml'}), file.name.replace('.fit', '_mod.gpx'));
+
+    if (file.ext === 'gpx') {
+        exportGPX(file);
+    } else {
+        exportFITasGPX(file);
+    }
+}
+
+function exportFITasGPX(file) {
+    const ns = 'http://www.topografix.com/GPX/1/1';
+    const nsXsi = 'http://www.w3.org/2001/XMLSchema-instance';
+    const doc = document.implementation.createDocument(ns, 'gpx', null);
+    const root = doc.documentElement;
+
+    root.setAttribute('version', '1.1');
+    root.setAttribute('creator', 'CycleEdit Pro');
+    root.setAttribute('xmlns:xsi', nsXsi);
+
+    const trk = doc.createElementNS(ns, 'trk');
+    const trkseg = doc.createElementNS(ns, 'trkseg');
+
+    file.points.forEach(p => {
+        const trkpt = doc.createElementNS(ns, 'trkpt');
+        if (p.lat !== null) trkpt.setAttribute('lat', p.lat);
+        if (p.lon !== null) trkpt.setAttribute('lon', p.lon);
+
+        if (p.ele !== null) {
+            const ele = doc.createElementNS(ns, 'ele');
+            ele.textContent = p.ele;
+            trkpt.appendChild(ele);
+        }
+
+        const time = doc.createElementNS(ns, 'time');
+        time.textContent = p.time.toISOString();
+        trkpt.appendChild(time);
+
+        if (p.pwr !== null) {
+            const ext = doc.createElementNS(ns, 'extensions');
+            const pwr = doc.createElement('power');
+            pwr.textContent = p.pwr;
+            ext.appendChild(pwr);
+            trkpt.appendChild(ext);
+        }
+
+        trkseg.appendChild(trkpt);
+    });
+
+    trk.appendChild(trkseg);
+    root.appendChild(trk);
+
+    const blob = new Blob([new XMLSerializer().serializeToString(doc)], { type: 'text/xml' });
+    downloadBlob(blob, file.name.replace('.fit', '_mod.gpx'));
+}
+
+function exportGPX(file) {
+    const newXml = file.xml.cloneNode(true);
+    const trks = newXml.querySelectorAll('trkpt');
+
+    trks.forEach((pt, i) => {
+        const pointData = file.points[i];
+        if (!pointData) return;
+
+        let pNode = pt.querySelector('power');
+        if (!pNode) pNode = pt.querySelector('PowerInWatts');
+
+        if (pNode && pointData.pwr !== null) {
+            pNode.textContent = pointData.pwr;
+        }
+
+        const tNode = pt.querySelector('time');
+        if (tNode) {
+            tNode.textContent = pointData.time.toISOString();
+        }
+    });
+
+    const blob = new Blob([new XMLSerializer().serializeToString(newXml)], { type: 'text/xml' });
+    downloadBlob(blob, `${file.name.replace('.gpx', '')}_mod.gpx`);
 }
 
 function downloadBlob(blob, name) {
