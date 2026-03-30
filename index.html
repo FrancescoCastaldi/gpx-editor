@@ -1,262 +1,141 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPX Editor - Power & Speed</title>
+    <title>CycleEdit Pro — Power & Speed Editor</title>
+    
+    <!-- Librerie Esterne -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root { --bg: #ffffff; --text: #1a1a1a; --card: #f5f5f5; --primary: #2563eb; --border: #e5e7eb; }
-        [data-theme="dark"] { --bg: #111827; --text: #f9fafb; --card: #1f2937; --primary: #3b82f6; --border: #374151; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; transition: 0.3s; }
-        .header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 20px; }
-        .container { max-width: 1200px; margin: 0 auto; display: grid; gap: 20px; }
-        .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
-        .drop-zone { border: 2px dashed var(--primary); padding: 40px; text-align: center; cursor: pointer; border-radius: 12px; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
-        .stat-card { background: var(--bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
-        .stat-val { font-size: 1.5rem; font-weight: bold; display: block; }
-        .controls { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; }
-        input, select, button { padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-        button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        #chartContainer { height: 400px; width: 100%; }
-        .hidden { display: none; }
-    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+    
+    <!-- Stili Locali -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="header">
-        <h1>GPX Editor</h1>
-        <button onclick="toggleTheme()" id="themeToggle">🌙 Mode</button>
-    </div>
 
-    <div class="container">
-        <div id="uploadArea" class="drop-zone" ondrop="handleDrop(event)" ondragover="event.preventDefault()" onclick="document.getElementById('fileInput').click()">
-            <p>Trascina il file .gpx qui oppure clicca per scegliere</p>
-            <input type="file" id="fileInput" class="hidden" accept=".gpx" onchange="handleFile(this.files[0])">
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            CycleEdit Pro
         </div>
+        <div class="navbar-actions">
+            <button class="btn-icon" id="themeToggle" onclick="toggleTheme()">☀️ Light</button>
+        </div>
+    </nav>
 
-        <div id="dashboard" class="card hidden">
+    <main class="main">
+        
+        <!-- Sezione Caricamento -->
+        <section class="upload-section">
+            <h2 class="upload-title">Modifica le tue Attività</h2>
+            <p class="upload-sub">Trascina uno o più file per iniziare la modifica bulk o singola.</p>
+            
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-icon">📂</div>
+                <div class="drop-text">Rilascia i file qui</div>
+                <div class="drop-sub">Supporta <span class="badge">.GPX</span> e <span class="badge cyan">.FIT</span></div>
+                <input type="file" id="fileInput" class="hidden" accept=".gpx,.fit" multiple>
+            </div>
+
+            <div class="file-list" id="fileList">
+                <!-- I file caricati appariranno qui -->
+            </div>
+        </section>
+
+        <!-- Interfaccia Editor (Nascosta inizialmente) -->
+        <div id="editorInterface" class="hidden">
+            
+            <!-- Dashboard Statistiche -->
             <div class="stats-grid">
-                <div class="stat-card"><span>Potenza Media</span><span class="stat-val" id="avgPower">-</span><span>W</span></div>
-                <div class="stat-card"><span>Velocità Media</span><span class="stat-val" id="avgSpeed">-</span><span>km/h</span></div>
-                <div class="stat-card"><span>Distanza</span><span class="stat-val" id="distance">-</span><span>km</span></div>
-                <div class="stat-card"><span>Durata</span><span class="stat-val" id="duration">-</span></div>
-                <div class="stat-card"><span>Trackpoints</span><span class="stat-val" id="points">-</span></div>
-                <div class="stat-card"><span>Dislivello +</span><span class="stat-val" id="elevation">-</span><span>m</span></div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-label">Potenza Media</div>
+                    <div class="stat-val" id="avgPower">-</div>
+                    <div class="stat-unit">Watts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💨</div>
+                    <div class="stat-label">Velocità Media</div>
+                    <div class="stat-val" id="avgSpeed">-</div>
+                    <div class="stat-unit">km/h</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📏</div>
+                    <div class="stat-label">Distanza</div>
+                    <div class="stat-val" id="distance">-</div>
+                    <div class="stat-unit">km</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-label">Durata</div>
+                    <div class="stat-val" id="duration">-</div>
+                    <div class="stat-unit">Tempo</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🏔️</div>
+                    <div class="stat-label">Dislivello +</div>
+                    <div class="stat-val" id="elevation">-</div>
+                    <div class="stat-unit">metri</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📍</div>
+                    <div class="stat-label">Punti</div>
+                    <div class="stat-val" id="points">-</div>
+                    <div class="stat-unit">Campioni</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 320px; gap: 20px;">
+                <!-- Grafico -->
+                <div class="card">
+                    <div class="card-title">
+                        Profilo Attività <span class="tag">Preview</span>
+                    </div>
+                    <div id="chartContainer">
+                        <canvas id="profileChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Controlli Editor -->
+                <div class="card">
+                    <div class="card-title">Strumenti di Modifica</div>
+                    
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label">Modalità di Modifica</label>
+                        <select id="editMode">
+                            <option value="both">Potenza + Velocità</option>
+                            <option value="watt">Solo Potenza (Watt)</option>
+                            <option value="speed">Solo Velocità (Tempo)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label">Target Potenza (W)</label>
+                        <input type="number" id="targetWatt" placeholder="es. 250">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label">Target Velocità (km/h)</label>
+                        <input type="number" id="targetSpeed" step="0.1" placeholder="es. 35.0">
+                    </div>
+
+                    <div class="preview-box">
+                        <div id="previewText">Pronto per le modifiche</div>
+                    </div>
+
+                    <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="exportFile()">
+                        <span>Esporta File Modificato</span>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <div id="visuals" class="card hidden">
-            <div id="chartContainer"><canvas id="profileChart"></canvas></div>
-        </div>
+    </main>
 
-        <div id="editor" class="card hidden">
-            <h3>Modifica Attività</h3>
-            <div class="controls">
-                <div>
-                    <label>Modalità</label><br>
-                    <select id="editMode" onchange="updatePreview()">
-                        <option value="both">Watt + Velocità</option>
-                        <option value="watt">Solo Watt</option>
-                        <option value="speed">Solo Velocità</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Target Watt (W)</label><br>
-                    <input type="number" id="targetWatt" placeholder="es. 250" oninput="updatePreview()">
-                </div>
-                <div>
-                    <label>Target Velocità (km/h)</label><br>
-                    <input type="number" id="targetSpeed" placeholder="es. 32.5" oninput="updatePreview()">
-                </div>
-                <button id="exportBtn" onclick="exportGPX()">Esporta _modified.gpx</button>
-            </div>
-            <p id="previewText" style="margin-top: 15px; font-size: 0.9rem; color: #666;"></p>
-        </div>
-    </div>
+    <div id="toast">Azione completata!</div>
 
-    <script>
-        let gpxData = { xml: null, points: [], name: "" };
-        let chart = null;
-
-        function toggleTheme() {
-            const body = document.documentElement;
-            const isDark = body.getAttribute('data-theme') === 'dark';
-            body.setAttribute('data-theme', isDark ? 'light' : 'dark');
-            document.getElementById('themeToggle').textContent = isDark ? '🌙 Mode' : '☀️ Mode';
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            handleFile(e.dataTransfer.files[0]);
-        }
-
-        async function handleFile(file) {
-            if (!file || !file.name.endsWith('.gpx')) return;
-            gpxData.name = file.name.replace('.gpx', '');
-            const text = await file.text();
-            const parser = new DOMParser();
-            gpxData.xml = parser.parseFromString(text, "text/xml");
-            parseGPX();
-        }
-
-        function parseGPX() {
-            const trks = gpxData.xml.querySelectorAll('trkpt');
-            const points = [];
-            let totalPower = 0;
-            let powerCount = 0;
-            let totalElev = 0;
-            let lastElev = null;
-
-            trks.forEach(pt => {
-                const lat = parseFloat(pt.getAttribute('lat'));
-                const lon = parseFloat(pt.getAttribute('lon'));
-                const ele = parseFloat(pt.querySelector('ele')?.textContent || 0);
-                const time = new Date(pt.querySelector('time')?.textContent);
-                const pwr = pt.querySelector('power, PowerInWatts')?.textContent;
-                
-                const point = { lat, lon, ele, time, pwr: pwr ? parseInt(pwr) : null };
-                points.push(point);
-
-                if (point.pwr !== null) { totalPower += point.pwr; powerCount++; }
-                if (lastElev !== null && ele > lastElev) totalElev += (ele - lastElev);
-                lastElev = ele;
-            });
-
-            gpxData.points = points;
-            updateDashboard(totalPower, powerCount, totalElev);
-            renderChart();
-            
-            document.getElementById('dashboard').classList.remove('hidden');
-            document.getElementById('visuals').classList.remove('hidden');
-            document.getElementById('editor').classList.remove('hidden');
-        }
-
-        function updateDashboard(totalPower, powerCount, totalElev) {
-            const points = gpxData.points;
-            if (points.length < 2) return;
-
-            const dist = calculateDistance(points);
-            const durationMs = points[points.length-1].time - points[0].time;
-            const avgSpd = (dist / (durationMs / 3600000)).toFixed(1);
-
-            document.getElementById('avgPower').textContent = powerCount > 0 ? Math.round(totalPower / powerCount) : 'N/A';
-            document.getElementById('avgSpeed').textContent = avgSpd;
-            document.getElementById('distance').textContent = dist.toFixed(2);
-            document.getElementById('duration').textContent = formatMs(durationMs);
-            document.getElementById('points').textContent = points.length;
-            document.getElementById('elevation').textContent = Math.round(totalElev);
-            
-            document.getElementById('targetWatt').value = powerCount > 0 ? Math.round(totalPower / powerCount) : '';
-            document.getElementById('targetSpeed').value = avgSpd;
-            updatePreview();
-        }
-
-        function calculateDistance(pts) {
-            let d = 0;
-            for(let i=1; i<pts.length; i++) {
-                const R = 6371;
-                const dLat = (pts[i].lat - pts[i-1].lat) * Math.PI / 180;
-                const dLon = (pts[i].lon - pts[i-1].lon) * Math.PI / 180;
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                        Math.cos(pts[i-1].lat * Math.PI / 180) * Math.cos(pts[i].lat * Math.PI / 180) * 
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-                d += 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * R;
-            }
-            return d;
-        }
-
-        function formatMs(ms) {
-            const s = Math.floor(ms / 1000);
-            return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
-        }
-
-        function renderChart() {
-            const ctx = document.getElementById('profileChart').getContext('2d');
-            if (chart) chart.destroy();
-            
-            const step = Math.max(1, Math.floor(gpxData.points.length / 500));
-            const sampled = gpxData.points.filter((_, i) => i % step === 0);
-
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: sampled.map((_, i) => i),
-                    datasets: [
-                        { label: 'Quota (m)', data: sampled.map(p => p.ele), borderColor: '#2563eb', yAxisID: 'y' },
-                        { label: 'Potenza (W)', data: sampled.map(p => p.pwr), borderColor: '#ef4444', yAxisID: 'y1' }
-                    ]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    scales: { y: { type: 'linear', position: 'left' }, y1: { type: 'linear', position: 'right', grid: { display: false } } }
-                }
-            });
-        }
-
-        function updatePreview() {
-            const mode = document.getElementById('editMode').value;
-            const currPwr = parseInt(document.getElementById('avgPower').textContent) || 0;
-            const currSpd = parseFloat(document.getElementById('avgSpeed').textContent) || 0;
-            const targetPwr = parseInt(document.getElementById('targetWatt').value) || currPwr;
-            const targetSpd = parseFloat(document.getElementById('targetSpeed').value) || currSpd;
-
-            let text = "";
-            if (mode !== 'speed' && currPwr > 0) {
-                const pDiff = (((targetPwr / currPwr) - 1) * 100).toFixed(1);
-                text += `Watt: ${pDiff}% | `;
-            }
-            if (mode !== 'watt') {
-                const sDiff = (((targetSpd / currSpd) - 1) * 100).toFixed(1);
-                text += `Tempo: ${(-sDiff).toFixed(1)}% (Velocità)`;
-            }
-            document.getElementById('previewText').textContent = text;
-        }
-
-        function exportGPX() {
-            const mode = document.getElementById('editMode').value;
-            const currPwr = parseInt(document.getElementById('avgPower').textContent) || 1;
-            const currSpd = parseFloat(document.getElementById('avgSpeed').textContent) || 1;
-            const targetPwr = parseInt(document.getElementById('targetWatt').value) || currPwr;
-            const targetSpd = parseFloat(document.getElementById('targetSpeed').value) || currSpd;
-
-            const pFactor = targetPwr / currPwr;
-            const tFactor = currSpd / targetSpd;
-
-            const newXml = gpxData.xml.cloneNode(true);
-            const trks = newXml.querySelectorAll('trkpt');
-            
-            let startTime = new Date(trks[0].querySelector('time').textContent).getTime();
-            let lastOrigTime = startTime;
-            let currentNewTime = startTime;
-
-            trks.forEach((pt, i) => {
-                // Power
-                if (mode !== 'speed') {
-                    const pNode = pt.querySelector('power, PowerInWatts');
-                    if (pNode) pNode.textContent = Math.round(parseInt(pNode.textContent) * pFactor);
-                }
-
-                // Time
-                if (mode !== 'watt' && i > 0) {
-                    const timeNode = pt.querySelector('time');
-                    const origTime = new Date(timeNode.textContent).getTime();
-                    const diff = origTime - lastOrigTime;
-                    currentNewTime += (diff * tFactor);
-                    timeNode.textContent = new Date(currentNewTime).toISOString();
-                    lastOrigTime = origTime;
-                }
-            });
-
-            const blob = new Blob([new XMLSerializer().serializeToString(newXml)], {type: 'text/xml'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${gpxData.name}_modified.gpx`;
-            a.click();
-        }
-    </script>
+    <!-- Script Logica -->
+    <script src="app.js"></script>
 </body>
 </html>
