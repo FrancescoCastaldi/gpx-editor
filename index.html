@@ -1,130 +1,1036 @@
 <!DOCTYPE html>
 <html lang="it" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CycleEdit Pro - Advanced Activity Editor</title>
-    <link rel="icon" href="logo.svg" type="image/svg+xml">
-    
-    <!-- Librerie Esterne -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-    
-    <style>
-        :root {
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --bg-dark: #020617;
-            --card-bg: #0f172a;
-            --card-border: #1e293b;
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-            --accent-green: #10b981;
-            --accent-red: #ef4444;
-            --accent-yellow: #f59e0b;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CycleEdit Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    /* ─── TOKENS ─── */
+    :root {
+      --bg:        #080c10;
+      --surface:   #0d1117;
+      --panel:     #111820;
+      --line:      #1c2630;
+      --line2:     #243040;
+      --primary:   #00d4ff;
+      --primary-dim:#0099bb;
+      --green:     #00e5a0;
+      --yellow:    #ffcc00;
+      --red:       #ff4455;
+      --text:      #e8f0f8;
+      --muted:     #4a6070;
+      --mono:      'Space Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+      --r:         10px;
+    }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); line-height: 1.5; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
-        .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; }
-        .logo-group { display: flex; flex-direction: column; }
-        .logo { font-size: 1.75rem; font-weight: 900; background: linear-gradient(135deg, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1.5px; line-height: 1; }
-        .tagline { font-size: 0.75rem; color: var(--text-dim); font-weight: 500; margin-top: 0.25rem; }
-        .stats-bar { display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 1rem; padding: 1rem; text-align: center; }
-        .stat-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
-        .stat-value { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
-        .drop-zone { border: 2px dashed var(--card-border); border-radius: 2rem; padding: 6rem 2rem; text-align: center; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: var(--card-bg); cursor: pointer; margin-top: 4rem; }
-        .drop-zone:hover, .drop-zone.active { border-color: var(--primary); background: #1e293b55; transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
-        .drop-zone h2 { font-size: 1.5rem; margin-bottom: 0.75rem; font-weight: 800; }
-        .drop-zone p { color: var(--text-dim); font-size: 0.938rem; }
-        .editor-layout { display: none; grid-template-columns: 1fr 340px; gap: 1.5rem; }
-        .main-content { display: flex; flex-direction: column; gap: 1.5rem; }
-        .preview-grid { display: grid; grid-template-rows: 400px 300px; gap: 1.5rem; }
-        .card { background: var(--card-bg); border-radius: 1.5rem; border: 1px solid var(--card-border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        #map { width: 100%; height: 100%; z-index: 1; background: #111; }
-        .chart-wrapper { padding: 1.5rem; height: 100%; }
-        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
-        .control-group { padding: 1.25rem; }
-        .control-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
-        .input-row { margin-bottom: 1rem; }
-        .input-row label { display: block; font-size: 0.813rem; font-weight: 500; color: var(--text-dim); margin-bottom: 0.5rem; }
-        .input-row input { width: 100%; background: #020617; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 0.75rem; color: white; font-size: 0.938rem; transition: all 0.2s; }
-        .input-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-        .btn { width: 100%; padding: 0.875rem; border-radius: 0.875rem; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.938rem; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-        .btn-export { background: var(--accent-green); color: white; margin-top: auto; }
-        .btn-export:hover { background: #059669; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
-        #loadingOverlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.8); display: none; place-items: center; z-index: 2000; backdrop-filter: blur(8px); }
-        .spinner { width: 48px; height: 48px; border: 4px solid #1e293b; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 1024px) { .editor-layout { grid-template-columns: 1fr; } .preview-grid { grid-template-rows: 350px 300px; } }
-    </style>
+    /* ─── RESET ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── SCANLINE OVERLAY ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,212,255,0.012) 2px,
+        rgba(0,212,255,0.012) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ─── NAVBAR ─── */
+    .navbar {
+      height: 56px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .brand-icon::after {
+      content: '⚡';
+      font-size: 14px;
+      filter: brightness(0);
+    }
+    .brand-name {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .brand-sep {
+      color: var(--muted);
+      font-family: var(--mono);
+      margin: 0 4px;
+    }
+    .brand-sub {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-pill {
+      background: var(--line);
+      border: 1px solid var(--line2);
+      border-radius: 4px;
+      padding: 4px 12px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .nav-pill.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(0,212,255,0.06);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .status-dot.live {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: blink 1.6s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ─── MAIN ─── */
+    .main { max-width: 1440px; margin: 0 auto; padding: 24px 24px 48px; }
+
+    /* ─── UPLOAD ─── */
+    #dropZone {
+      border: 1px solid var(--line2);
+      border-radius: var(--r);
+      background: var(--surface);
+      padding: 80px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    #dropZone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(0,212,255,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 110%, rgba(0,212,255,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    #dropZone:hover, #dropZone.drag-over {
+      border-color: var(--primary);
+      background: var(--panel);
+      transform: translateY(-2px);
+      box-shadow: 0 0 40px rgba(0,212,255,0.08), 0 0 0 1px var(--primary);
+    }
+    .drop-rings {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      margin: 0 auto 24px;
+    }
+    .drop-rings::before, .drop-rings::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid var(--primary);
+      animation: ringpulse 2s ease-out infinite;
+    }
+    .drop-rings::before { inset: 0; opacity: 0.5; animation-delay: 0s; }
+    .drop-rings::after  { inset: -16px; opacity: 0.2; animation-delay: 0.5s; }
+    @keyframes ringpulse {
+      0%  { transform: scale(0.85); opacity: 0.6; }
+      100%{ transform: scale(1.2); opacity: 0; }
+    }
+    .drop-icon-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+    }
+    .drop-headline {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .drop-sub {
+      color: var(--muted);
+      font-size: 0.875rem;
+      margin-bottom: 20px;
+    }
+    .format-tags {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .fmt-tag {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 4px 12px;
+      border-radius: 3px;
+      border: 1px solid;
+    }
+    .fmt-tag.fit  { color: var(--primary); border-color: var(--primary); background: rgba(0,212,255,0.08); }
+    .fmt-tag.gpx  { color: var(--green);   border-color: var(--green);   background: rgba(0,229,160,0.08); }
+    #fileInput { display: none; }
+
+    /* ─── EDITOR LAYOUT ─── */
+    #editorLayout { display: none; }
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 16px;
+      align-items: start;
+    }
+    .left-col { display: flex; flex-direction: column; gap: 16px; }
+
+    /* ─── STATS ROW ─── */
+    #statsBar {
+      display: none;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      padding: 18px 16px;
+      text-align: center;
+      transition: background 0.2s;
+    }
+    .stat-card:hover { background: var(--panel); }
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1;
+    }
+    .stat-unit {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ─── CARD ─── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .card-title {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 6px var(--primary);
+    }
+    .card-body { padding: 18px; }
+
+    /* ─── MAP ─── */
+    #map { height: 380px; width: 100%; }
+    .leaflet-container { background: #0a0f14 !important; }
+
+    /* ─── CHART ─── */
+    .chart-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .chart-tab {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 3px;
+      border: 1px solid var(--line2);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chart-tab.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #000;
+    }
+    .chart-tab:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
+    #chartContainer { height: 260px; padding: 16px 18px; }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .sidebar .card-body { display: flex; flex-direction: column; gap: 14px; }
+
+    /* ─── FORM ELEMENTS ─── */
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    input[type="number"] {
+      background: var(--panel);
+      border: 1px solid var(--line2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      width: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
+    input[type="number"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(0,212,255,0.12);
+    }
+    .range-hint {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    /* ─── SEGMENT VIZ ─── */
+    .segment-bar {
+      height: 6px;
+      background: var(--line2);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .segment-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--green));
+      border-radius: 3px;
+      transition: all 0.3s;
+      position: absolute;
+    }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      padding: 10px 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+    }
+    .btn-apply {
+      background: transparent;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+    }
+    .btn-apply:hover {
+      background: var(--primary);
+      color: #000;
+      box-shadow: 0 0 16px rgba(0,212,255,0.3);
+    }
+    .btn-export {
+      background: var(--green);
+      color: #000;
+    }
+    .btn-export:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 0 20px rgba(0,229,160,0.35);
+    }
+    .btn-export:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      filter: none;
+      box-shadow: none;
+    }
+    .btn-divider { height: 1px; background: var(--line); }
+
+    /* ─── LOADING ─── */
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8,12,16,0.92);
+      backdrop-filter: blur(10px);
+      display: none;
+      place-items: center;
+      z-index: 2000;
+      flex-direction: column;
+    }
+    .loader-ring {
+      width: 60px;
+      height: 60px;
+      border: 2px solid var(--line2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-top: 16px;
+      text-transform: uppercase;
+    }
+
+    /* ─── TOAST ─── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--green);
+      color: #000;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.3s;
+      z-index: 9998;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ─── FILE INFO BAR ─── */
+    .file-info-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      margin-bottom: 16px;
+    }
+    .file-badge {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .file-badge.fit { background: rgba(0,212,255,0.15); color: var(--primary); border: 1px solid var(--primary); }
+    .file-badge.gpx { background: rgba(0,229,160,0.15); color: var(--green); border: 1px solid var(--green); }
+    .file-name {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text);
+      flex: 1;
+    }
+    .file-pts {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    /* ─── CROSSHAIR GRID DECORATION ─── */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.25;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .main { position: relative; z-index: 1; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 1024px) {
+      .editor-grid { grid-template-columns: 1fr; }
+      #statsBar { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .main { padding: 16px 12px; }
+      .navbar { padding: 0 16px; }
+      #statsBar { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
 <body>
-    <div id="loadingOverlay">
-        <div class="spinner"></div>
+  <div class="grid-bg"></div>
+
+  <!-- LOADING -->
+  <div id="loadingOverlay" style="display:none; place-items:center; flex-direction:column;">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Elaborazione attività...</div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast">✓ Completato</div>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-icon"></div>
+      <div>
+        <div class="brand-name">CycleEdit<span class="brand-sep">/</span>Pro</div>
+        <div class="brand-sub">Activity Intelligence v2</div>
+      </div>
     </div>
-    <div class="container">
-        <header class="header">
-            <div class="logo-group">
-                <div class="logo">CYCLE EDIT PRO</div>
-                <div class="tagline">Advanced Activity Power & Speed Intelligence</div>
+    <div class="nav-right">
+      <div class="nav-pill" id="fileInfo">
+        <span class="status-dot"></span>AWAITING INPUT
+      </div>
+      <div class="nav-pill active" id="navMode">EDIT MODE</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- UPLOAD ZONE -->
+    <div id="dropZone">
+      <div class="drop-rings">
+        <div class="drop-icon-inner">🚴</div>
+      </div>
+      <div class="drop-headline">Carica la tua attività</div>
+      <div class="drop-sub">Trascina qui il file oppure clicca per selezionarlo</div>
+      <div class="format-tags">
+        <span class="fmt-tag fit">FIT</span>
+        <span class="fmt-tag gpx">GPX</span>
+      </div>
+      <input type="file" id="fileInput" accept=".gpx,.fit">
+    </div>
+
+    <!-- EDITOR -->
+    <div id="editorLayout">
+
+      <!-- STATS BAR -->
+      <div id="statsBar">
+        <div class="stat-card">
+          <div class="stat-label">Distanza</div>
+          <div id="statDist" class="stat-value">—</div>
+          <div class="stat-unit">km</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Dislivello ↑</div>
+          <div id="statEle" class="stat-value">—</div>
+          <div class="stat-unit">m</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Watt Medi</div>
+          <div id="statAvgPwr" class="stat-value">—</div>
+          <div class="stat-unit">W</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Durata</div>
+          <div id="statTime" class="stat-value">—</div>
+          <div class="stat-unit">hh:mm:ss</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Vel. Media</div>
+          <div id="statSpeed" class="stat-value">—</div>
+          <div class="stat-unit">km/h</div>
+        </div>
+      </div>
+
+      <!-- FILE INFO BAR -->
+      <div class="file-info-bar" id="fileInfoBar">
+        <span class="file-badge fit" id="fileBadge">FIT</span>
+        <span class="file-name" id="fileName">—</span>
+        <span class="file-pts" id="filePts">0 punti</span>
+      </div>
+
+      <!-- EDITOR GRID -->
+      <div class="editor-grid">
+        <!-- LEFT -->
+        <div class="left-col">
+
+          <!-- MAP -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Traccia GPS</div>
+              <span style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);">LEAFLET / OSM</span>
             </div>
-            <div id="fileInfo" class="tagline">Trascina un file per iniziare</div>
-        </header>
-        <div id="statsBar" class="stats-bar">
-            <div class="stat-card"><div class="stat-label">Distanza</div><div id="statDist" class="stat-value">0.0 km</div></div>
-            <div class="stat-card"><div class="stat-label">Dislivello</div><div id="statEle" class="stat-value">0 m</div></div>
-            <div class="stat-card"><div class="stat-label">Watt Medi</div><div id="statAvgPwr" class="stat-value">0 W</div></div>
-            <div class="stat-card"><div class="stat-label">Tempo</div><div id="statTime" class="stat-value">00:00:00</div></div>
-        </div>
-        <div id="dropZone" class="drop-zone">
-            <h2>Pronto per l'elaborazione</h2>
-            <p>Carica il tuo file .FIT o .GPX per sbloccare l'analisi</p>
-            <input type="file" id="fileInput" hidden accept=".gpx,.fit">
-        </div>
+            <div id="map"></div>
+          </div>
 
-        <div id="editorLayout" class="editor-layout">
-            <div class="main-content">
-                <div class="preview-grid">
-                    <div class="card"><div id="map"></div></div>
-                    <div class="card"><div class="chart-wrapper"><canvas id="activityChart"></canvas></div></div>
-                </div>
+          <!-- CHART -->
+          <div class="card">
+            <div class="chart-tabs">
+              <button class="chart-tab active" onclick="switchTab('power',this)">Potenza</button>
+              <button class="chart-tab" onclick="switchTab('speed',this)">Velocità</button>
+              <button class="chart-tab" onclick="switchTab('elevation',this)">Altitudine</button>
+              <button class="chart-tab" onclick="switchTab('hr',this)">HR</button>
             </div>
-            <aside class="sidebar">
-                <div class="card control-group">
-                    <div class="control-title">Segmento di Modifica</div>
-                    <div class="input-row"><label>Inizio (%)</label><input type="number" id="rangeStart" value="0" min="0" max="100"></div>
-                    <div class="input-row"><label>Fine (%)</label><input type="number" id="rangeEnd" value="100" min="0" max="100"></div>
-                </div>
-                <div class="card control-group">
-                    <div class="control-title">Regolazione Potenza</div>
-                    <div class="input-row"><label>Variazione %</label><input type="number" id="powerPct" value="0"></div>
-                    <div class="input-row"><label>Aggiunta (W)</label><input type="number" id="powerAdd" value="0"></div>
-                    <button class="btn btn-primary" onclick="applyPowerChanges()">Applica Potenza</button>
-                </div>
-                <div class="card control-group">
-                    <div class="control-title">Regolazione Velocità</div>
-                    <div class="input-row"><label>Fattore Moltiplicativo</label><input type="number" id="speedMult" value="1.0" step="0.01"></div>
-                    <button class="btn btn-primary" onclick="applySpeedChanges()">Applica Velocità</button>
-                </div>
-                <button class="btn btn-export" id="exportBtn">Esporta Attività</button>
-            </aside>
+            <div id="chartContainer"><canvas id="activityChart"></canvas></div>
+          </div>
+
         </div>
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+
+          <!-- SEGMENT -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Segmento</div>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Inizio %</label>
+                  <input type="number" id="rangeStart" value="0" min="0" max="100" oninput="updateSegmentBar()">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Fine %</label>
+                  <input type="number" id="rangeEnd" value="100" min="0" max="100" oninput="updateSegmentBar()">
+                </div>
+              </div>
+              <div class="segment-bar">
+                <div class="segment-fill" id="segmentFill" style="left:0%;width:100%;"></div>
+              </div>
+              <div class="range-hint" id="rangeHint">Tutti i punti selezionati</div>
+            </div>
+          </div>
+
+          <!-- POWER -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot" style="background:var(--yellow);box-shadow:0 0 6px var(--yellow)"></span>Potenza</div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Variazione %</label>
+                <input type="number" id="powerPct" value="0" placeholder="es: +10 o -5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Offset fisso (W)</label>
+                <input type="number" id="powerAdd" value="0" placeholder="es: +20">
+              </div>
+              <button class="btn btn-apply" onclick="applyPowerChanges()">⚡ Applica Potenza</button>
+            </div>
+          </div>
+
+          <!-- SPEED -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></span>Velocità</div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Fattore moltiplicativo</label>
+                <input type="number" id="speedMult" value="1.0" step="0.01" min="0.1" max="5" placeholder="1.0 = invariato">
+              </div>
+              <button class="btn btn-apply" onclick="applySpeedChanges()">▶ Applica Velocità</button>
+            </div>
+          </div>
+
+          <div class="btn-divider"></div>
+
+          <!-- EXPORT -->
+          <button class="btn btn-export" id="exportBtn" disabled>↓ Esporta Attività</button>
+
+        </aside>
+      </div>
     </div>
 
-    <div id="loadingOverlay">
-        <div style="text-align: center;">
-            <div class="spinner"></div>
-            <p style="margin-top: 1rem; color: var(--text-main);">Elaborazione attività...</p>
-        </div>
-    </div>
+  </main>
 
-    <script src="app.js"></script>
+  <script>
+    // ─── SEGMENT BAR ───
+    function updateSegmentBar() {
+      const s = parseFloat(document.getElementById('rangeStart').value) || 0;
+      const e = parseFloat(document.getElementById('rangeEnd').value) || 100;
+      const clamped_s = Math.max(0, Math.min(100, s));
+      const clamped_e = Math.max(0, Math.min(100, e));
+      const fill = document.getElementById('segmentFill');
+      fill.style.left  = clamped_s + '%';
+      fill.style.width = Math.max(0, clamped_e - clamped_s) + '%';
+      const hint = document.getElementById('rangeHint');
+      if (clamped_s === 0 && clamped_e === 100) hint.textContent = 'Tutti i punti selezionati';
+      else hint.textContent = `Segmento: ${clamped_s}% → ${clamped_e}%`;
+    }
+
+    // ─── CHART TABS ───
+    function switchTab(type, el) {
+      document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      currentChartType = type;
+      if (activityData) renderChart(type);
+    }
+
+    // ─── DROP ZONE ───
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+    // ─── LOADING ───
+    function showLoading(v) {
+      const ol = document.getElementById('loadingOverlay');
+      ol.style.display = v ? 'grid' : 'none';
+    }
+
+    // ─── TOAST ───
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    // ─── DATA ───
+    let activityData = null;
+    let activityChart = null;
+    let map = null;
+    let mapPolyline = null;
+    let currentChartType = 'power';
+
+    // ─── PROCESS FILE ───
+    async function processFile(file) {
+      showLoading(true);
+      const ext = file.name.split('.').pop().toLowerCase();
+      try {
+        const text = await file.text();
+        let data;
+        if (ext === 'gpx') data = parseGPX(text);
+        else { showToast('⚠ Supporto FIT in sviluppo. Usa un file GPX.'); showLoading(false); return; }
+
+        activityData = data;
+        updateUI(file.name, ext, data);
+      } catch(err) {
+        showToast('✕ Errore nel parsing del file');
+        console.error(err);
+      }
+      showLoading(false);
+    }
+
+    // ─── PARSE GPX ───
+    function parseGPX(text) {
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const trkpts = xml.querySelectorAll('trkpt');
+      const points = [];
+      trkpts.forEach(pt => {
+        const lat  = parseFloat(pt.getAttribute('lat'));
+        const lon  = parseFloat(pt.getAttribute('lon'));
+        const ele  = parseFloat(pt.querySelector('ele')?.textContent || 0);
+        const time = pt.querySelector('time')?.textContent || null;
+        const extNs = pt.querySelector('power,pwr,watts');
+        const hrEl = pt.querySelector('hr,heartrate,bpm');
+        const power = extNs ? parseFloat(extNs.textContent) : null;
+        const hr    = hrEl  ? parseFloat(hrEl.textContent)  : null;
+        const cadEl = pt.querySelector('cad,cadence');
+        const cad   = cadEl ? parseFloat(cadEl.textContent) : null;
+        if (!isNaN(lat) && !isNaN(lon)) points.push({ lat, lon, ele, time, power, hr, cad });
+      });
+      // compute speed & distance
+      let dist = 0;
+      for (let i = 1; i < points.length; i++) {
+        const d = haversine(points[i-1], points[i]);
+        dist += d;
+        points[i].dist = dist;
+        if (points[i].time && points[i-1].time) {
+          const dt = (new Date(points[i].time) - new Date(points[i-1].time)) / 1000;
+          points[i].speed = dt > 0 ? (d / dt) * 3.6 : 0;
+        }
+      }
+      points[0].dist = 0;
+      points[0].speed = 0;
+      // elevation gain
+      let eleGain = 0;
+      for (let i = 1; i < points.length; i++) {
+        const diff = points[i].ele - points[i-1].ele;
+        if (diff > 0) eleGain += diff;
+      }
+      // duration
+      let duration = 0;
+      if (points[0].time && points[points.length-1].time)
+        duration = (new Date(points[points.length-1].time) - new Date(points[0].time)) / 1000;
+      const avgPwr = points.filter(p => p.power).length
+        ? points.filter(p => p.power).reduce((s,p) => s + p.power, 0) / points.filter(p => p.power).length
+        : null;
+      const avgSpd = points.filter(p => p.speed).length
+        ? points.filter(p => p.speed).reduce((s,p) => s + p.speed, 0) / points.filter(p => p.speed).length
+        : null;
+      return { points, dist, eleGain, duration, avgPwr, avgSpd };
+    }
+
+    function haversine(a, b) {
+      const R = 6371000;
+      const dLat = (b.lat - a.lat) * Math.PI / 180;
+      const dLon = (b.lon - a.lon) * Math.PI / 180;
+      const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+    }
+
+    // ─── UPDATE UI ───
+    function updateUI(filename, ext, data) {
+      // file info bar
+      document.getElementById('fileBadge').textContent = ext.toUpperCase();
+      document.getElementById('fileBadge').className = 'file-badge ' + ext;
+      document.getElementById('fileName').textContent = filename;
+      document.getElementById('filePts').textContent = data.points.length + ' punti';
+      document.getElementById('fileInfo').innerHTML =
+        `<span class="status-dot live"></span>${filename}`;
+
+      // stats
+      document.getElementById('statDist').textContent = (data.dist / 1000).toFixed(1);
+      document.getElementById('statEle').textContent  = Math.round(data.eleGain);
+      document.getElementById('statAvgPwr').textContent = data.avgPwr ? Math.round(data.avgPwr) : '—';
+      document.getElementById('statTime').textContent  = fmtDuration(data.duration);
+      document.getElementById('statSpeed').textContent = data.avgSpd ? data.avgSpd.toFixed(1) : '—';
+
+      document.getElementById('statsBar').style.display = 'grid';
+      document.getElementById('dropZone').style.display = 'none';
+      document.getElementById('editorLayout').style.display = 'block';
+      document.getElementById('exportBtn').disabled = false;
+
+      renderMap(data.points);
+      renderChart('power');
+    }
+
+    // ─── MAP ───
+    function renderMap(points) {
+      if (!map) {
+        map = L.map('map', { zoomControl: true, attributionControl: false });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19
+        }).addTo(map);
+      }
+      if (mapPolyline) map.removeLayer(mapPolyline);
+      const latlngs = points.map(p => [p.lat, p.lon]);
+      mapPolyline = L.polyline(latlngs, { color: '#00d4ff', weight: 3, opacity: 0.9 }).addTo(map);
+      map.fitBounds(mapPolyline.getBounds(), { padding: [20, 20] });
+    }
+
+    // ─── CHART ───
+    function renderChart(type) {
+      const pts = activityData.points;
+      const labels = pts.map((p, i) => (p.dist / 1000).toFixed(2));
+
+      let dataset, color, label;
+      if (type === 'power')     { dataset = pts.map(p => p.power ?? 0); color = '#ffcc00'; label = 'Potenza (W)'; }
+      else if (type === 'speed'){ dataset = pts.map(p => p.speed ?? 0); color = '#00d4ff'; label = 'Velocità (km/h)'; }
+      else if (type === 'elevation'){ dataset = pts.map(p => p.ele ?? 0); color = '#00e5a0'; label = 'Altitudine (m)'; }
+      else if (type === 'hr')   { dataset = pts.map(p => p.hr ?? 0); color = '#ff4455'; label = 'FC (bpm)'; }
+
+      const ctx = document.getElementById('activityChart').getContext('2d');
+      if (activityChart) activityChart.destroy();
+      activityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label,
+            data: dataset,
+            borderColor: color,
+            backgroundColor: color + '18',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ticks: { color: '#4a6070', font: { family: 'Space Mono', size: 10 }, maxTicksLimit: 8 },
+              grid: { color: '#1c2630' }
+            },
+            y: {
+              ticks: { color: '#4a6070', font: { family: 'Space Mono', size: 10 } },
+              grid: { color: '#1c2630' }
+            }
+          }
+        }
+      });
+    }
+
+    // ─── FORMAT DURATION ───
+    function fmtDuration(s) {
+      if (!s) return '—';
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = Math.floor(s % 60);
+      return [h, m, sec].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    // ─── APPLY POWER ───
+    function applyPowerChanges() {
+      if (!activityData) return;
+      const pct = parseFloat(document.getElementById('powerPct').value) || 0;
+      const add = parseFloat(document.getElementById('powerAdd').value) || 0;
+      const s   = parseFloat(document.getElementById('rangeStart').value) / 100;
+      const e   = parseFloat(document.getElementById('rangeEnd').value) / 100;
+      const pts = activityData.points;
+      const from = Math.floor(s * pts.length);
+      const to   = Math.ceil(e  * pts.length);
+      for (let i = from; i < to; i++) {
+        if (pts[i].power != null) {
+          pts[i].power = Math.max(0, pts[i].power * (1 + pct/100) + add);
+        }
+      }
+      renderChart(currentChartType);
+      showToast('⚡ Potenza aggiornata');
+    }
+
+    // ─── APPLY SPEED ───
+    function applySpeedChanges() {
+      if (!activityData) return;
+      const mult = parseFloat(document.getElementById('speedMult').value) || 1;
+      const s    = parseFloat(document.getElementById('rangeStart').value) / 100;
+      const e    = parseFloat(document.getElementById('rangeEnd').value) / 100;
+      const pts  = activityData.points;
+      const from = Math.floor(s * pts.length);
+      const to   = Math.ceil(e  * pts.length);
+      for (let i = from; i < to; i++) {
+        if (pts[i].speed != null) pts[i].speed = Math.max(0, pts[i].speed * mult);
+      }
+      renderChart(currentChartType);
+      showToast('▶ Velocità aggiornata');
+    }
+
+    // ─── EXPORT ───
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      if (!activityData) return;
+      const pts = activityData.points;
+      let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="CycleEditPro" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk><name>CycleEditPro Export</name><trkseg>\n`;
+      pts.forEach(p => {
+        gpx += `    <trkpt lat="${p.lat}" lon="${p.lon}">`;
+        if (p.ele !== undefined) gpx += `<ele>${p.ele.toFixed(1)}</ele>`;
+        if (p.time) gpx += `<time>${p.time}</time>`;
+        gpx += `</trkpt>\n`;
+      });
+      gpx += `  </trkseg></trk>\n</gpx>`;
+      const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = 'cycleedit_export.gpx';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✓ File esportato');
+    });
+  </script>
 </body>
 </html>
