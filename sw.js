@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cycleedit-v1';
+const CACHE_NAME = 'cycleedit-v2';
 const ASSETS = [
     './',
     './index.html',
@@ -21,21 +21,18 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(keys => {
-            return Promise.all(
-                keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-            );
-        })
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+        )
     );
     self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-    // Non intercettare richieste non-GET
     if (event.request.method !== 'GET') return;
-    // Per le risorse esterne (CDN), usa network-first con fallback cache
     const url = new URL(event.request.url);
     const isExternal = url.origin !== self.location.origin;
+
     if (isExternal) {
         event.respondWith(
             fetch(event.request)
@@ -49,7 +46,6 @@ self.addEventListener('fetch', event => {
                 .catch(() => caches.match(event.request))
         );
     } else {
-        // Per risorse locali: cache-first
         event.respondWith(
             caches.match(event.request).then(cached => {
                 if (cached) return cached;
