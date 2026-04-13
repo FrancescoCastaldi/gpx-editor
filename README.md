@@ -4,35 +4,33 @@
 
 # GPX Editor — Power & Speed
 
-GPX Editor è un'applicazione web standalone per modificare file GPX di attività ciclistiche (nativamente compatibile con Garmin Connect e Strava). Tutto il processing avviene localmente nel browser: i tuoi dati non lasciano mai il computer.
+GPX Editor is a standalone web application for editing GPX files of cycling activities (natively compatible with Garmin Connect and Strava). All processing happens locally in the browser: your data never leaves your computer.
 
-## Funzionalità principali
+## Key Features
 
-- **Zero dipendenze server**: Funziona 100% offline.
-- **Dashboard attività**: Visualizzazione immediata di 6 KPI (Potenza media, Velocità media, Distanza, Durata, Trackpoints, Dislivello +).
-- **Grafico Profilo**: Profilo altimetrico e potenza sovrapposta tramite Chart.js.
-- **Modifica Proporzionale**:
-  - **Watt**: Scala tutti i dati di potenza basandosi su un target medio.
-  - **Velocità**: Comprime o dilata i timestamp per raggiungere la velocità media desiderata senza alterare le coordinate GPS.
-- **Export**: Scarica il file modificato pronto per la re-importazione.
-- **Dark/Light Mode**: Supporto per temi chiaro e scuro.
+- **Zero server dependencies**: Works 100% offline.
+- **Activity Dashboard**: Instant display of 6 KPIs (Average Power, Average Speed, Distance, Duration, Trackpoints, Elevation +).
+- **Profile Chart**: Elevation profile and overlaid power via Chart.js.
+- **Proportional Edit**:
+  - **Watts**: Scales all power data based on a target average.
+  - **Speed**: Compresses or stretches timestamps to reach the desired average speed without altering GPS coordinates.
+- **Export**: Download the modified file ready for re-import.
+- **Dark/Light Mode**: Support for light and dark themes.
 
-## Come iniziare
+## Getting Started
 
-1. Apri `index.html` nel tuo browser.
-2. Trascina un file `.gpx` nella zona di caricamento.
-3. Seleziona la modalità di modifica (Watt, Velocità o entrambi).
-4. Inserisci i valori target.
-5. Clicca su "Esporta" per scaricare il nuovo file.
+1. Open `index.html` in your browser.
+2. Drag a `.gpx` file into the upload area.
+3. Select the edit mode (Watts, Speed, or both).
+4. Enter the target values.
+5. Click "Export" to download the new file.
 
-## Note tecniche
+## Technical Notes
 
-- L'app utilizza un parser XML nativo del browser.
-- I grafici sono campionati automaticamente per garantire fluidità anche con file molto grandi.
-- Se il file originale non contiene dati di potenza, le opzioni relative ai Watt verranno disabilitate o segnalate.
+- The app uses the browser's native XML parser.
+- Charts are automatically sampled to ensure smooth performance even with very large files.
+- If the original file contains no power data, Watts-related options will be disabled or flagged.
 
 ## Privacy
 
-L'app non invia dati a server esterni. I file vengono letti localmente tramite l'API `FileReader` e processati in memoria.
-
----
+The app does not send data to external servers. Files are read locally via the `FileReader` API and processed in memory.
