@@ -36,4 +36,3 @@ GPX Editor √® un'applicazione web standalone per modificare file GPX di attivit√
 L'app non invia dati a server esterni. I file vengono letti localmente tramite l'API `FileReader` e processati in memoria.
 
 ---
-Sviluppato per appassionati di ciclismo e data analysis.
