@@ -29,13 +29,15 @@ function setupEventListeners() {
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) exportBtn.onclick = exportCurrentFile;
 
-    const powerSlider = document.getElementById('powerSlider');
-    if (powerSlider) {
-        powerSlider.oninput = (e) => {
-            const val = parseInt(e.target.value);
-            document.getElementById('powerOffsetDisplay').textContent = (val >= 0 ? '+' : '') + val + 'W';
-            applyLivePowerOffset(val);
+    // Nuovo slider proporzionale per la potenza media target
+    const targetSlider = document.getElementById('powerTargetSlider');
+    if (targetSlider) {
+        targetSlider.oninput = (e) => {
+            const targetAvg = parseInt(e.target.value);
+            document.getElementById('powerTargetDisplay').textContent = targetAvg + ' W';
+            applyProportionalPower(targetAvg);
         };
+        targetSlider.disabled = true;  // abilitato solo dopo il caricamento
     }
 
     document.addEventListener('click', (e) => {
@@ -119,88 +121,83 @@ async function parseGPX(fileData) {
 
 async function parseFIT(fileData) {
     const arrayBuffer = await fileData.raw.arrayBuffer();
-    const { default: FitParser } = await import('https://cdn.jsdelivr.net/npm/fit-file-parser@2.3.3/+esm');
-    const parser = new FitParser({
-        force: true,
-        mode: 'both',
-        lengthUnit: 'km',
-        temperatureUnit: 'celsius',
-        speedUnit: 'km/h'
-    });
+    try {
+        // Usa la libreria ufficiale Garmin per un parsing affidabile
+        const { default: FitSDK } = await import('https://unpkg.com/@garmin/fitsdk@latest/dist/fitsdk.mjs');
+        const sdk = new FitSDK();
+        const { messages } = sdk.decode(new Uint8Array(arrayBuffer));
 
-    return new Promise((resolve, reject) => {
-        parser.parse(arrayBuffer, (err, data) => {
-            if (err) return reject(err);
+        fileData.fitRaw = messages;
+        fileData.sessions = messages.session || [];
+        fileData.laps = messages.lap || [];
+        fileData.deviceInfo = messages.deviceInfo || [];
 
-            fileData.fitRaw = data;
-            fileData.sessions = data.sessions || [];
-            fileData.laps = data.laps || [];
-            fileData.deviceInfo = data.device_infos || [];
+        if (fileData.sessions.length > 0) {
+            const session = fileData.sessions[0];
+            fileData.originalSessionPower = {
+                avg: session.avgPower || null,
+                max: session.maxPower || null,
+                normalized: session.normalizedPower || null
+            };
+        }
 
-            if (fileData.sessions.length > 0) {
-                fileData.originalSessionPower = {
-                    avg: fileData.sessions[0].avg_power ?? null,
-                    max: fileData.sessions[0].max_power ?? null,
-                    normalized: fileData.sessions[0].normalized_power ?? null
-                };
-            }
-
-            (data.records || []).forEach(r => {
-                const cadence = (r.cadence ?? 0) + (r.fractional_cadence ?? 0);
-                const point = {
-                    lat: r.position_lat ?? null,
-                    lon: r.position_long ?? null,
-                    ele: r.enhanced_altitude ?? r.altitude ?? 0,
-                    time: new Date(r.timestamp),
-                    pwr: r.power ?? null,
-                    hr: r.heart_rate ?? null,
-                    cadence: cadence > 0 ? cadence : null,
-                    speed: r.enhanced_speed ?? r.speed ?? null,
-                    distance: r.distance ?? null,
-                    temperature: r.temperature ?? null,
-                    verticalOscillation: r.vertical_oscillation ?? null,
-                    stanceTime: r.stance_time ?? null,
-                    leftRightBalance: r.left_right_balance ?? null,
-                    calories: r.calories ?? null
-                };
-                fileData.points.push(point);
-                fileData.originalPower.push(point.pwr);
-                fileData.originalHR.push(point.hr);
-                fileData.originalCadence.push(point.cadence);
-                fileData.originalSpeed.push(point.speed);
-            });
-
-            resolve();
+        (messages.record || []).forEach(r => {
+            const cadence = (r.cadence || 0) + (r.fractionalCadence || 0);
+            const point = {
+                lat: r.positionLat || null,
+                lon: r.positionLong || null,
+                ele: r.enhancedAltitude || r.altitude || 0,
+                time: new Date(r.timestamp),
+                pwr: r.power || null,
+                hr: r.heartRate || null,
+                cadence: cadence > 0 ? cadence : null,
+                speed: r.enhancedSpeed || r.speed || null,
+                distance: r.distance || null,
+                temperature: r.temperature || null,
+                verticalOscillation: r.verticalOscillation || null,
+                stanceTime: r.stanceTime || null,
+                leftRightBalance: r.leftRightBalance || null,
+                calories: r.calories || null
+            };
+            fileData.points.push(point);
+            fileData.originalPower.push(point.pwr);
+            fileData.originalHR.push(point.hr);
+            fileData.originalCadence.push(point.cadence);
+            fileData.originalSpeed.push(point.speed);
         });
-    });
+    } catch (error) {
+        console.error('Errore parsing FIT con Garmin SDK:', error);
+        alert('Impossibile leggere il file .fit. Assicurati che sia un file valido.');
+        throw error;
+    }
 }
 
 function computeStats(fileData) {
     const { points, sessions, laps } = fileData;
     const s = sessions[0];
 
-    const distanceKm = s?.total_distance != null
-        ? (s.total_distance).toFixed(2)
+    const distanceKm = s?.totalDistance != null
+        ? (s.totalDistance).toFixed(2)
         : calcDistance(points).toFixed(2);
 
     return {
         distance: distanceKm,
-        duration: s?.total_timer_time != null ? formatDuration(s.total_timer_time) : calcDuration(points),
-        totalAscent: s?.total_ascent ?? calcElevation(points),
-        totalDescent: s?.total_descent ?? null,
-        avgSpeed: s?.avg_speed != null ? parseFloat(s.avg_speed).toFixed(1) : (avg(points, 'speed') != null ? avg(points, 'speed').toFixed(1) : null),
-        maxSpeed: s?.max_speed != null ? parseFloat(s.max_speed).toFixed(1) : (max(points, 'speed') != null ? max(points, 'speed').toFixed(1) : null),
-        avgPower: s?.avg_power ?? avg(points, 'pwr'),
-        maxPower: s?.max_power ?? max(points, 'pwr'),
-        normalizedPower: s?.normalized_power ?? calcNP(points),
-        avgHR: s?.avg_heart_rate ?? avg(points, 'hr'),
-        maxHR: s?.max_heart_rate ?? max(points, 'hr'),
-        avgCadence: s?.avg_cadence ?? avg(points, 'cadence'),
-        maxCadence: s?.max_cadence ?? max(points, 'cadence'),
-        totalCalories: s?.total_calories ?? null,
-        tss: s?.training_stress_score != null ? Math.round(s.training_stress_score) : null,
-        intensityFactor: s?.intensity_factor != null ? s.intensity_factor.toFixed(2) : null,
-        totalWork: s?.total_work != null ? Math.round(s.total_work / 1000) : null
+        duration: s?.totalTimerTime != null ? formatDuration(s.totalTimerTime) : calcDuration(points),
+        totalAscent: s?.totalAscent ?? calcElevation(points),
+        totalDescent: s?.totalDescent ?? null,
+        avgSpeed: s?.avgSpeed != null ? parseFloat(s.avgSpeed).toFixed(1) : (avg(points, 'speed') != null ? avg(points, 'speed').toFixed(1) : null),
+        maxSpeed: s?.maxSpeed != null ? parseFloat(s.maxSpeed).toFixed(1) : (max(points, 'speed') != null ? max(points, 'speed').toFixed(1) : null),
+        avgPower: s?.avgPower ?? avg(points, 'pwr'),
+        maxPower: s?.maxPower ?? max(points, 'pwr'),
+        normalizedPower: s?.normalizedPower ?? calcNP(points),
+        avgHR: s?.avgHeartRate ?? avg(points, 'hr'),
+        maxHR: s?.maxHeartRate ?? max(points, 'hr'),
+        avgCadence: s?.avgCadence ?? avg(points, 'cadence'),
+        maxCadence: s?.maxCadence ?? max(points, 'cadence'),
+        totalCalories: s?.totalCalories ?? null,
+        tss: s?.trainingStressScore != null ? Math.round(s.trainingStressScore) : null,
+        intensityFactor: s?.intensityFactor != null ? s.intensityFactor.toFixed(2) : null,
+        totalWork: s?.totalWork != null ? Math.round(s.totalWork / 1000) : null
     };
 }
 
@@ -293,10 +290,21 @@ function renderActiveFile() {
     const file = activeFiles[currentFileIndex];
     if (!file) return;
 
-    const powerSlider = document.getElementById('powerSlider');
-    if (powerSlider) {
-        powerSlider.value = 0;
-        document.getElementById('powerOffsetDisplay').textContent = '+0W';
+    // Configura il nuovo slider per la potenza media target
+    const targetSlider = document.getElementById('powerTargetSlider');
+    if (targetSlider) {
+        const stats = computeStats(file);
+        if (stats.avgPower) {
+            // Intervallo di ±200 W attorno alla potenza media attuale
+            targetSlider.min = Math.max(1, stats.avgPower - 200).toString();
+            targetSlider.max = (stats.avgPower + 200).toString();
+            targetSlider.value = stats.avgPower;
+            targetSlider.disabled = false;
+            document.getElementById('powerTargetDisplay').textContent = stats.avgPower + ' W';
+        } else {
+            targetSlider.disabled = true;
+            document.getElementById('powerTargetDisplay').textContent = '— W';
+        }
     }
 
     const hasPwr = file.points.some(p => p.pwr != null);
@@ -350,7 +358,7 @@ function renderStats(file) {
             ${stat('Lavoro', stats.totalWork, ' kJ')}
         </div>
         ${file.laps.length > 1 ? renderLapsTable(file.laps) : ''}
-        ${file.deviceInfo.length > 0 ? `<div class="device-info">📱 ${[file.deviceInfo[0].manufacturer, file.deviceInfo[0].garmin_product].filter(Boolean).join(' ')}</div>` : ''}
+        ${file.deviceInfo.length > 0 ? `<div class="device-info">📱 ${[file.deviceInfo[0].manufacturer, file.deviceInfo[0].garminProduct].filter(Boolean).join(' ')}</div>` : ''}
     `;
 }
 
@@ -358,12 +366,12 @@ function renderLapsTable(laps) {
     const rows = laps.map((lap, i) => `
         <tr>
             <td>${i + 1}</td>
-            <td>${lap.total_distance != null ? (lap.total_distance).toFixed(2) : '—'} km</td>
-            <td>${lap.total_timer_time != null ? formatDuration(lap.total_timer_time) : '—'}</td>
-            <td>${lap.avg_power ?? '—'} W</td>
-            <td>${lap.avg_heart_rate ?? '—'} bpm</td>
-            <td>${lap.avg_speed != null ? parseFloat(lap.avg_speed).toFixed(1) : '—'} km/h</td>
-            <td>${lap.avg_cadence ?? '—'} rpm</td>
+            <td>${lap.totalDistance != null ? (lap.totalDistance).toFixed(2) : '—'} km</td>
+            <td>${lap.totalTimerTime != null ? formatDuration(lap.totalTimerTime) : '—'}</td>
+            <td>${lap.avgPower ?? '—'} W</td>
+            <td>${lap.avgHeartRate ?? '—'} bpm</td>
+            <td>${lap.avgSpeed != null ? parseFloat(lap.avgSpeed).toFixed(1) : '—'} km/h</td>
+            <td>${lap.avgCadence ?? '—'} rpm</td>
         </tr>
     `).join('');
     return `
@@ -446,24 +454,34 @@ function renderMap(file) {
     }).addTo(map);
 }
 
-function applyLivePowerOffset(offset) {
+function applyProportionalPower(targetAvg) {
     const file = activeFiles[currentFileIndex];
     if (!file) return;
 
-    file.points.forEach((p, i) => {
-        const orig = file.originalPower[i];
-        p.pwr = orig != null ? Math.max(0, orig + offset) : null;
+    const stats = computeStats(file);
+    const currentAvg = stats.avgPower;
+    if (!currentAvg || currentAvg === 0) return;
+
+    const scaleFactor = targetAvg / currentAvg;
+
+    // Modifica tutti i punti
+    file.points.forEach((point, index) => {
+        const originalPower = file.originalPower[index];
+        if (originalPower !== null) {
+            point.pwr = Math.round(originalPower * scaleFactor);
+        }
     });
 
+    // Aggiorna i dati di sessione
     if (file.sessions.length > 0 && file.originalSessionPower) {
         const osp = file.originalSessionPower;
-        const s = file.sessions[0];
-        if (osp.avg != null) s.avg_power = Math.max(0, osp.avg + offset);
-        if (osp.max != null) s.max_power = Math.max(0, osp.max + offset);
-        s.normalized_power = calcNP(file.points);
+        const session = file.sessions[0];
+        if (osp.avg != null) session.avgPower = Math.round(osp.avg * scaleFactor);
+        if (osp.max != null) session.maxPower = Math.round(osp.max * scaleFactor);
+        session.normalizedPower = calcNP(file.points);
     }
 
-    file.modified = offset !== 0;
+    file.modified = (scaleFactor !== 1.0);
     if (activeChartMetric === 'pwr') renderChart(file);
     renderStats(file);
 }
