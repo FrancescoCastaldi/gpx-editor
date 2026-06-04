@@ -1,4 +1,4 @@
-import { computeStats, calcNP } from './utils.js';
+import { calcNP } from './utils.js';
 import { parseGPX, parseFIT, createFileData } from './parsers.js';
 import { exportGPX, exportFIT } from './exporters.js';
 import {
@@ -12,7 +12,7 @@ let currentFileIndex = -1;
 let activeChartMetric = 'pwr';
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('../sw.js').then(reg => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
         reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             if (newWorker) {
@@ -170,11 +170,12 @@ function applyProportionalPower(targetAvg) {
     const file = activeFiles[currentFileIndex];
     if (!file) return;
 
-    const stats = computeStats(file);
-    const currentAvg = stats.avgPower;
-    if (!currentAvg || currentAvg === 0) return;
+    const origVals = file.originalPower.filter(v => v != null);
+    if (!origVals.length) return;
+    const originalAvg = Math.round(origVals.reduce((a, b) => a + b, 0) / origVals.length);
+    if (!originalAvg || originalAvg === 0) return;
 
-    const scaleFactor = targetAvg / currentAvg;
+    const scaleFactor = targetAvg / originalAvg;
 
     file.points.forEach((point, index) => {
         const originalPower = file.originalPower[index];

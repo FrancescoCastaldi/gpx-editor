@@ -2,6 +2,17 @@ import { calcGPXSpeed } from './utils.js';
 
 const FIT_SDK_URL = 'https://esm.sh/@garmin/fitsdk@21.202.0';
 
+function findByLocalName(parent, localNames) {
+    if (!parent) return null;
+    const all = parent.getElementsByTagName('*');
+    for (const el of all) {
+        if (localNames.includes(el.localName)) {
+            return el.textContent;
+        }
+    }
+    return null;
+}
+
 export async function parseGPX(fileData) {
     const text = await fileData.raw.text();
     const xml = new DOMParser().parseFromString(text, 'text/xml');
@@ -14,10 +25,12 @@ export async function parseGPX(fileData) {
     fileData.xml = xml;
 
     xml.querySelectorAll('trkpt').forEach(pt => {
-        const pwrStr = pt.querySelector('power, PowerInWatts')?.textContent;
-        const hrStr = pt.querySelector('hr, heartrate, HeartRateBpm value, bpm')?.textContent;
-        const cadStr = pt.querySelector('cad, cadence')?.textContent;
-        const speedStr = pt.querySelector('speed')?.textContent;
+        const ext = pt.querySelector('extensions');
+
+        const pwrStr = findByLocalName(ext, ['power', 'PowerInWatts', 'watts']);
+        const hrStr = findByLocalName(ext, ['hr', 'heartrate', 'HeartRateBpm', 'bpm']);
+        const cadStr = findByLocalName(ext, ['cad', 'cadence']);
+        const speedStr = findByLocalName(ext, ['speed']);
 
         const point = {
             lat: parseFloat(pt.getAttribute('lat')),
