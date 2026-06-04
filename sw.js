@@ -1,8 +1,12 @@
-const CACHE_NAME = 'cycleedit-v3';
+const CACHE_NAME = 'cycleedit-v4';
 const LOCAL_ASSETS = [
     './',
     './index.html',
-    './app.js',
+    './src/app.js',
+    './src/utils.js',
+    './src/parsers.js',
+    './src/exporters.js',
+    './src/ui.js',
     './style.css',
     './logo.svg'
 ];
@@ -31,7 +35,6 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     const isSameOrigin = url.origin === self.location.origin;
 
-    // Per le risorse locali usa cache-first (aggiorna la cache in background)
     if (isSameOrigin) {
         event.respondWith(
             caches.match(event.request).then(cached => {
@@ -41,7 +44,7 @@ self.addEventListener('fetch', event => {
                         caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                     }
                     return response;
-                }).catch(() => cached); // se la rete fallisce usa la cache
+                }).catch(() => cached);
 
                 return cached || fetchPromise;
             })
@@ -49,7 +52,6 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Per CDN e font: network-first con fallback alla cache
     event.respondWith(
         fetch(event.request)
             .then(response => {

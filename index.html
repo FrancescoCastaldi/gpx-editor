@@ -14,7 +14,7 @@
 
   <div id="loadingOverlay" class="loading-overlay" style="display:none">
     <div class="loader-spinner"></div>
-    <p class="loader-text">Analisi attività in corso…</p>
+    <p class="loader-text">Analisi attivit&agrave; in corso&hellip;</p>
   </div>
 
   <div id="toast" class="toast"></div>
@@ -37,11 +37,10 @@
     </div>
   </nav>
 
-  <!-- UPLOAD -->
   <main class="page-container" id="uploadSection">
     <div class="upload-hero">
-      <h1 class="upload-title">Analizza la tua attività</h1>
-      <p class="upload-subtitle">Carica un file <strong>GPX</strong> o <strong>FIT</strong> per visualizzare tutte le metriche e modificare potenza e velocità</p>
+      <h1 class="upload-title">Analizza la tua attivit&agrave;</h1>
+      <p class="upload-subtitle">Carica un file <strong>GPX</strong> o <strong>FIT</strong> per visualizzare tutte le metriche e modificare potenza e velocit&agrave;</p>
       <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Area di caricamento file">
         <div class="drop-zone-inner">
           <div class="drop-zone-icon">
@@ -63,12 +62,11 @@
     </div>
   </main>
 
-  <!-- EDITOR -->
-  <main class="page-container hidden" id="editorLayout">
+  <main class="page-container" id="editorLayout">
 
     <div class="top-bar">
       <div id="activityList" class="activity-chips"></div>
-      <button class="btn-icon btn-add" id="addFileBtn" title="Aggiungi attività">
+      <button class="btn-icon btn-add" id="addFileBtn" title="Aggiungi attivit&agrave;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -77,10 +75,8 @@
       <input type="file" id="fileInput2" accept=".gpx,.fit" multiple style="display:none">
     </div>
 
-    <!-- Metrics dashboard -->
     <section id="statsPanel" class="stats-section"></section>
 
-    <!-- Map + Chart -->
     <div class="viz-grid">
       <div class="card">
         <div class="card-header">
@@ -95,7 +91,7 @@
         <div class="card-header chart-header">
           <span class="card-label">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            Profilo attività
+            Profilo attivit&agrave;
           </span>
           <div id="metricBtns" class="metric-tabs"></div>
         </div>
@@ -105,7 +101,6 @@
       </div>
     </div>
 
-    <!-- Edit + Export -->
     <div class="card controls-card">
       <div class="card-header">
         <span class="card-label">
@@ -117,7 +112,7 @@
         <div class="slider-control">
           <div class="slider-header">
             <span class="slider-label">Potenza Media Target</span>
-            <span id="powerTargetDisplay" class="slider-value">— W</span>
+            <span id="powerTargetDisplay" class="slider-value">&mdash; W</span>
           </div>
           <input type="range" id="powerTargetSlider" class="power-slider" min="50" max="400" value="0" step="1" disabled>
           <div class="slider-ticks">
@@ -132,7 +127,7 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            Esporta attività
+            Esporta attivit&agrave;
           </button>
         </div>
       </div>
@@ -142,24 +137,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <script src="app.js"></script>
-  <script>
-    const themeToggle = document.getElementById('themeToggle');
-    const themeIcon   = document.getElementById('themeIcon');
-    let currentTheme  = 'dark';
-    themeToggle.addEventListener('click', () => {
-      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', currentTheme);
-      themeIcon.innerHTML = currentTheme === 'dark'
-        ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
-        : '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
-    });
-    document.getElementById('addFileBtn').addEventListener('click', () => {
-      document.getElementById('fileInput2').click();
-    });
-    document.getElementById('fileInput2').addEventListener('change', e => {
-      if (e.target.files[0]) handleFiles(e.target.files);
-    });
-  </script>
+  <script type="module" src="src/app.js"></script>
 </body>
 </html>
