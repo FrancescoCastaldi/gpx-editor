@@ -200,8 +200,8 @@ describe('GPX export with namespace handling', () => {
     });
 });
 
-describe('applyProportionalPower uses original average', () => {
-    it('scaleFactor is always based on original power, not modified', async () => {
+describe('applyProportionalPower uses additive approach', () => {
+    it('adds delta to all power points (not multiplicative)', async () => {
         const { createFileData, parseGPX } = await import('../src/parsers.js');
 
         const gpx = `<?xml version="1.0" encoding="UTF-8"?>
@@ -217,40 +217,41 @@ describe('applyProportionalPower uses original average', () => {
       <time>2024-01-01T10:00:01Z</time>
       <extensions><power>300</power></extensions>
     </trkpt>
+    <trkpt lat="45.02" lon="9.02">
+      <ele>120</ele>
+      <time>2024-01-01T10:00:02Z</time>
+      <extensions><power>400</power></extensions>
+    </trkpt>
   </trkseg></trk>
 </gpx>`;
 
         const fileData = createFileData({ name: 'test.gpx', text: () => Promise.resolve(gpx) });
         await parseGPX(fileData);
 
-        expect(fileData.originalPower).toEqual([200, 300]);
-        const originalAvg = Math.round((200 + 300) / 2);
-        expect(originalAvg).toBe(250);
+        expect(fileData.originalPower).toEqual([200, 300, 400]);
+        const originalAvg = Math.round((200 + 300 + 400) / 3);
+        expect(originalAvg).toBe(300);
 
-        const targetAvg = 300;
-        const scaleFactor = targetAvg / originalAvg;
-
-        fileData.points.forEach((point, index) => {
-            const originalPower = fileData.originalPower[index];
-            if (originalPower !== null) {
-                point.pwr = Math.round(originalPower * scaleFactor);
-            }
-        });
-
-        expect(fileData.points[0].pwr).toBe(Math.round(200 * 1.2));
-        expect(fileData.points[1].pwr).toBe(Math.round(300 * 1.2));
-
-        const targetAvg2 = 200;
-        const scaleFactor2 = targetAvg2 / originalAvg;
+        const targetAvg = 350;
+        const delta = targetAvg - originalAvg;
+        expect(delta).toBe(50);
 
         fileData.points.forEach((point, index) => {
             const originalPower = fileData.originalPower[index];
             if (originalPower !== null) {
-                point.pwr = Math.round(originalPower * scaleFactor2);
+                point.pwr = originalPower + delta;
             }
         });
 
-        expect(fileData.points[0].pwr).toBe(Math.round(200 * 0.8));
-        expect(fileData.points[1].pwr).toBe(Math.round(300 * 0.8));
+        expect(fileData.points[0].pwr).toBe(250);
+        expect(fileData.points[1].pwr).toBe(350);
+        expect(fileData.points[2].pwr).toBe(450);
+
+        const newAvg = Math.round((250 + 350 + 450) / 3);
+        expect(newAvg).toBe(350);
+        expect(newAvg).toBe(targetAvg);
+
+        expect(fileData.points[2].pwr).toBe(450);
+        expect(fileData.points[2].pwr).toBeLessThan(600);
     });
 });

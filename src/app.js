@@ -1,4 +1,3 @@
-import { calcNP } from './utils.js';
 import { parseGPX, parseFIT, createFileData } from './parsers.js';
 import { exportGPX, exportFIT } from './exporters.js';
 import {
@@ -175,24 +174,16 @@ function applyProportionalPower(targetAvg) {
     const originalAvg = Math.round(origVals.reduce((a, b) => a + b, 0) / origVals.length);
     if (!originalAvg || originalAvg === 0) return;
 
-    const scaleFactor = targetAvg / originalAvg;
+    const delta = targetAvg - originalAvg;
 
     file.points.forEach((point, index) => {
         const originalPower = file.originalPower[index];
         if (originalPower !== null) {
-            point.pwr = Math.round(originalPower * scaleFactor);
+            point.pwr = originalPower + delta;
         }
     });
 
-    if (file.sessions.length > 0 && file.originalSessionPower) {
-        const osp = file.originalSessionPower;
-        const session = file.sessions[0];
-        if (osp.avg != null) session.avgPower = Math.round(osp.avg * scaleFactor);
-        if (osp.max != null) session.maxPower = Math.round(osp.max * scaleFactor);
-        session.normalizedPower = calcNP(file.points);
-    }
-
-    file.modified = (scaleFactor !== 1.0);
+    file.modified = (delta !== 0);
     if (activeChartMetric === 'pwr') renderChart(file, activeChartMetric);
     renderStats(file);
 }
