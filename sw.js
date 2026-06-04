@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cycleedit-v4';
+const CACHE_NAME = 'cycleedit-v5';
 const LOCAL_ASSETS = [
     './',
     './index.html',
@@ -23,10 +23,15 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(keys =>
-            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-        )
+            Promise.all(keys.map(k => {
+                if (k !== CACHE_NAME) return caches.delete(k);
+            }))
+        ).then(() => self.clients.claim())
     );
-    self.clients.claim();
+});
+
+self.addEventListener('message', event => {
+    if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {
