@@ -99,6 +99,7 @@ async function parseGPX(fileData) {
         const pwrStr = pt.querySelector('power, PowerInWatts')?.textContent;
         const hrStr = pt.querySelector('hr, heartrate, HeartRateBpm value, bpm')?.textContent;
         const cadStr = pt.querySelector('cad, cadence')?.textContent;
+        const speedStr = pt.querySelector('speed')?.textContent;
         const point = {
             lat: parseFloat(pt.getAttribute('lat')),
             lon: parseFloat(pt.getAttribute('lon')),
@@ -107,7 +108,7 @@ async function parseGPX(fileData) {
             pwr: pwrStr ? parseInt(pwrStr) : null,
             hr: hrStr ? parseInt(hrStr) : null,
             cadence: cadStr ? parseInt(cadStr) : null,
-            speed: null,
+            speed: speedStr ? +(parseFloat(speedStr) * 3.6).toFixed(2) : null,
             distance: null,
             temperature: null
         };
@@ -115,49 +116,50 @@ async function parseGPX(fileData) {
         fileData.originalPower.push(point.pwr);
         fileData.originalHR.push(point.hr);
         fileData.originalCadence.push(point.cadence);
-        fileData.originalSpeed.push(null);
+        fileData.originalSpeed.push(point.speed);
     });
+    calcGPXSpeed(fileData.points);
 }
 
 async function parseFIT(fileData) {
     const arrayBuffer = await fileData.raw.arrayBuffer();
     try {
-        // Usa la libreria ufficiale Garmin per un parsing affidabile
-        const { default: FitSDK } = await import('https://unpkg.com/@garmin/fitsdk@latest/dist/fitsdk.mjs');
-        const sdk = new FitSDK();
-        const { messages } = sdk.decode(new Uint8Array(arrayBuffer));
+        const sdk = await import('https://cdn.jsdelivr.net/npm/@garmin/fitsdk@21.202.0/src/index.js');
+        const { Decoder, Stream } = sdk;
+        const stream = Stream.fromArrayBuffer(arrayBuffer);
+        const decoder = new Decoder(stream);
+        const { messages } = decoder.read();
 
         fileData.fitRaw = messages;
-        fileData.sessions = messages.session || [];
-        fileData.laps = messages.lap || [];
-        fileData.deviceInfo = messages.deviceInfo || [];
+        fileData.sessions = messages.sessionMesgs || [];
+        fileData.laps = messages.lapMesgs || [];
+        fileData.deviceInfo = messages.deviceInfoMesgs || [];
 
         if (fileData.sessions.length > 0) {
             const session = fileData.sessions[0];
             fileData.originalSessionPower = {
-                avg: session.avgPower || null,
-                max: session.maxPower || null,
-                normalized: session.normalizedPower || null
+                avg: session.avgPower ?? null,
+                max: session.maxPower ?? null,
+                normalized: session.normalizedPower ?? null
             };
         }
 
-        (messages.record || []).forEach(r => {
-            const cadence = (r.cadence || 0) + (r.fractionalCadence || 0);
+        (messages.recordMesgs || []).forEach(r => {
+            const rawCad = r.cadence != null ? r.cadence : 0;
+            const fracCad = r.fractionalCadence != null ? r.fractionalCadence : 0;
+            const cadence = rawCad + fracCad;
+            const rawSpeed = r.enhancedSpeed ?? r.speed ?? null;
             const point = {
-                lat: r.positionLat || null,
-                lon: r.positionLong || null,
-                ele: r.enhancedAltitude || r.altitude || 0,
-                time: new Date(r.timestamp),
-                pwr: r.power || null,
-                hr: r.heartRate || null,
+                lat: r.positionLat ?? null,
+                lon: r.positionLong ?? null,
+                ele: r.enhancedAltitude ?? r.altitude ?? 0,
+                time: r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp),
+                pwr: r.power ?? null,
+                hr: r.heartRate ?? null,
                 cadence: cadence > 0 ? cadence : null,
-                speed: r.enhancedSpeed || r.speed || null,
-                distance: r.distance || null,
-                temperature: r.temperature || null,
-                verticalOscillation: r.verticalOscillation || null,
-                stanceTime: r.stanceTime || null,
-                leftRightBalance: r.leftRightBalance || null,
-                calories: r.calories || null
+                speed: rawSpeed != null ? +(rawSpeed * 3.6).toFixed(2) : null,
+                distance: r.distance != null ? r.distance / 1000 : null,
+                temperature: r.temperature ?? null
             };
             fileData.points.push(point);
             fileData.originalPower.push(point.pwr);
@@ -173,20 +175,20 @@ async function parseFIT(fileData) {
 }
 
 function computeStats(fileData) {
-    const { points, sessions, laps } = fileData;
+    const { points, sessions } = fileData;
     const s = sessions[0];
 
     const distanceKm = s?.totalDistance != null
-        ? (s.totalDistance).toFixed(2)
+        ? (s.totalDistance / 1000).toFixed(2)
         : calcDistance(points).toFixed(2);
 
     return {
         distance: distanceKm,
         duration: s?.totalTimerTime != null ? formatDuration(s.totalTimerTime) : calcDuration(points),
         totalAscent: s?.totalAscent ?? calcElevation(points),
-        totalDescent: s?.totalDescent ?? null,
-        avgSpeed: s?.avgSpeed != null ? parseFloat(s.avgSpeed).toFixed(1) : (avg(points, 'speed') != null ? avg(points, 'speed').toFixed(1) : null),
-        maxSpeed: s?.maxSpeed != null ? parseFloat(s.maxSpeed).toFixed(1) : (max(points, 'speed') != null ? max(points, 'speed').toFixed(1) : null),
+        totalDescent: s?.totalDescent ?? calcDescent(points),
+        avgSpeed: s?.avgSpeed != null ? (s.avgSpeed * 3.6).toFixed(1) : (avg(points, 'speed') != null ? avg(points, 'speed').toFixed(1) : null),
+        maxSpeed: s?.maxSpeed != null ? (s.maxSpeed * 3.6).toFixed(1) : (max(points, 'speed') != null ? max(points, 'speed').toFixed(1) : null),
         avgPower: s?.avgPower ?? avg(points, 'pwr'),
         maxPower: s?.maxPower ?? max(points, 'pwr'),
         normalizedPower: s?.normalizedPower ?? calcNP(points),
@@ -228,6 +230,27 @@ function haversine(lat1, lon1, lat2, lon2) {
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calcGPXSpeed(points) {
+    for (let i = 1; i < points.length; i++) {
+        if (points[i].speed != null) continue;
+        if (points[i].lat == null || points[i - 1].lat == null) continue;
+        const distKm = haversine(points[i - 1].lat, points[i - 1].lon, points[i].lat, points[i].lon);
+        const timeSec = (points[i].time - points[i - 1].time) / 1000;
+        if (timeSec > 0) {
+            points[i].speed = +(distKm / (timeSec / 3600)).toFixed(2);
+        }
+    }
+}
+
+function calcDescent(points) {
+    let loss = 0;
+    for (let i = 1; i < points.length; i++) {
+        const diff = (points[i].ele ?? 0) - (points[i - 1].ele ?? 0);
+        if (diff < 0) loss += -diff;
+    }
+    return Math.round(loss);
 }
 
 function calcElevation(points) {
@@ -358,7 +381,7 @@ function renderStats(file) {
             ${stat('Lavoro', stats.totalWork, ' kJ')}
         </div>
         ${file.laps.length > 1 ? renderLapsTable(file.laps) : ''}
-        ${file.deviceInfo.length > 0 ? `<div class="device-info">📱 ${[file.deviceInfo[0].manufacturer, file.deviceInfo[0].garminProduct].filter(Boolean).join(' ')}</div>` : ''}
+        ${file.deviceInfo.length > 0 ? `<div class="device-info">📱 ${[file.deviceInfo[0].manufacturer, file.deviceInfo[0].productName, file.deviceInfo[0].garminProduct].filter(Boolean).join(' ')}</div>` : ''}
     `;
 }
 
@@ -366,11 +389,11 @@ function renderLapsTable(laps) {
     const rows = laps.map((lap, i) => `
         <tr>
             <td>${i + 1}</td>
-            <td>${lap.totalDistance != null ? (lap.totalDistance).toFixed(2) : '—'} km</td>
+            <td>${lap.totalDistance != null ? (lap.totalDistance / 1000).toFixed(2) : '—'} km</td>
             <td>${lap.totalTimerTime != null ? formatDuration(lap.totalTimerTime) : '—'}</td>
             <td>${lap.avgPower ?? '—'} W</td>
             <td>${lap.avgHeartRate ?? '—'} bpm</td>
-            <td>${lap.avgSpeed != null ? parseFloat(lap.avgSpeed).toFixed(1) : '—'} km/h</td>
+            <td>${lap.avgSpeed != null ? (lap.avgSpeed * 3.6).toFixed(1) : '—'} km/h</td>
             <td>${lap.avgCadence ?? '—'} rpm</td>
         </tr>
     `).join('');
@@ -501,10 +524,21 @@ function exportGPX(file) {
         let ext = pt.querySelector('extensions');
         if (!ext) { ext = xml.createElement('extensions'); pt.appendChild(ext); }
 
+        const oldVariants = [
+            'power', 'PowerInWatts', 'watts', 'gpxtpx:Power',
+            'hr', 'heartrate', 'HeartRateBpm', 'bpm', 'gpxtpx:hr',
+            'cad', 'cadence', 'gpxtpx:cad',
+            'speed', 'gpxtpx:speed'
+        ];
+        oldVariants.forEach(tag => {
+            const nodes = ext.querySelectorAll(tag);
+            nodes.forEach(n => n.remove());
+        });
+
         const setNode = (tag, val) => {
-            let node = ext.querySelector(tag);
-            if (!node) { node = xml.createElement(tag); ext.appendChild(node); }
+            const node = xml.createElement(tag);
             node.textContent = val;
+            ext.appendChild(node);
         };
 
         if (p.pwr != null) setNode('power', p.pwr);
